@@ -1,0 +1,110 @@
+import Dexie, { type Table } from 'dexie'
+
+export interface BaseRec {
+  id: string
+  createdAt: number
+  updatedAt: number
+  /** tombstone timestamp — deleted records are kept so deletions sync across devices */
+  deleted?: number
+}
+
+export interface PrepItem extends BaseRec {
+  text: string
+  done: 0 | 1
+  doneAt?: number
+}
+
+export interface Session extends BaseRec {
+  date: string // YYYY-MM-DD
+  notes: string
+  takeaways: string
+}
+
+export interface Practice extends BaseRec {
+  title: string
+  note: string
+  active: 0 | 1
+  sourceSessionId?: string
+}
+
+export interface PracticeLog extends BaseRec {
+  practiceId: string
+  date: string // YYYY-MM-DD
+}
+
+export interface Mood extends BaseRec {
+  at: number
+  score: number // 1..5
+  note: string
+}
+
+export interface Insight extends BaseRec {
+  title: string
+  content: string
+}
+
+class AnchorDB extends Dexie {
+  prepItems!: Table<PrepItem, string>
+  sessions!: Table<Session, string>
+  practices!: Table<Practice, string>
+  practiceLogs!: Table<PracticeLog, string>
+  moods!: Table<Mood, string>
+  insights!: Table<Insight, string>
+
+  constructor() {
+    super('anchor')
+    this.version(1).stores({
+      prepItems: 'id, done, updatedAt',
+      sessions: 'id, date, updatedAt',
+      practices: 'id, active, updatedAt',
+      practiceLogs: 'id, practiceId, date, updatedAt',
+      moods: 'id, at, updatedAt',
+      insights: 'id, createdAt, updatedAt',
+    })
+  }
+}
+
+export const db = new AnchorDB()
+
+export const TABLES = [
+  'prepItems',
+  'sessions',
+  'practices',
+  'practiceLogs',
+  'moods',
+  'insights',
+] as const
+export type TableName = (typeof TABLES)[number]
+
+export function newRec(): BaseRec {
+  const now = Date.now()
+  return { id: crypto.randomUUID(), createdAt: now, updatedAt: now }
+}
+
+export function alive<T extends BaseRec>(r: T): boolean {
+  return !r.deleted
+}
+
+export async function patch<T extends BaseRec>(
+  table: Table<T, string>,
+  id: string,
+  changes: Partial<T>,
+) {
+  await table.update(id, (obj: T) => {
+    Object.assign(obj, changes, { updatedAt: Date.now() })
+  })
+}
+
+export async function softDelete<T extends BaseRec>(table: Table<T, string>, id: string) {
+  const now = Date.now()
+  await table.update(id, (obj: T) => {
+    Object.assign(obj, { deleted: now, updatedAt: now })
+  })
+}
+
+export function todayStr(d = new Date()): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
