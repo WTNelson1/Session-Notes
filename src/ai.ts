@@ -94,14 +94,20 @@ export async function buildContext(sinceDays: number | null): Promise<string> {
     }
   }
 
-  const openPrep = prep.filter((p) => !p.done)
-  const coveredPrep = prep.filter((p) => p.done)
+  const describeTopic = (p: (typeof prep)[number]) => {
+    const subs = prep.filter((c) => c.parentId === p.id)
+    return subs.length
+      ? `"${p.text}" (details: ${subs.map((c) => `"${c.text}"`).join('; ')})`
+      : `"${p.text}"`
+  }
+  const openPrep = prep.filter((p) => !p.done && !p.parentId)
+  const coveredPrep = prep.filter((p) => p.done && !p.parentId)
   if (openPrep.length || coveredPrep.length) {
     parts.push('## Session-prep topics')
     if (openPrep.length)
-      parts.push('Not yet discussed: ' + openPrep.map((p) => `"${p.text}"`).join('; '))
+      parts.push('Not yet discussed: ' + openPrep.map(describeTopic).join('; '))
     if (coveredPrep.length)
-      parts.push('Already covered: ' + coveredPrep.map((p) => `"${p.text}"`).join('; '))
+      parts.push('Already covered: ' + coveredPrep.map(describeTopic).join('; '))
   }
 
   return parts.join('\n\n')

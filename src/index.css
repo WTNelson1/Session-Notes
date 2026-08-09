@@ -176,6 +176,60 @@ label.field .label-text {
 .check-item .text { flex: 1; line-height: 1.4; }
 .check-item.done .text { color: var(--text-soft); text-decoration: line-through; }
 
+/* ---------- prep sub-items ---------- */
+.topic-group { border-bottom: 1px solid var(--border); }
+.topic-group:last-child { border-bottom: none; }
+.topic-group .check-item { border-bottom: none; }
+.check-item.sub-item {
+  margin-left: 30px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  font-size: 14px;
+}
+.check-item.sub-item input[type='checkbox'] { width: 17px; height: 17px; }
+.sub-input { margin: 4px 0 10px 30px; }
+.sub-input input { padding: 7px 10px; font-size: 14px; }
+.hint { font-weight: 400; text-transform: none; letter-spacing: 0; }
+
+/* ---------- outline editor ---------- */
+.outline-editor {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px 6px;
+}
+.outline-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.outline-bullet {
+  line-height: 1.5;
+  padding-top: 3px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.outline-bullet.lvl-1 { opacity: 0.7; }
+.outline-bullet.lvl-2 { opacity: 0.45; }
+.outline-line textarea {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 3px 0;
+  min-height: 0;
+  resize: none;
+  overflow: hidden;
+  line-height: 1.5;
+}
+.outline-line textarea:focus { outline: none; }
+.outline-toolbar {
+  display: flex;
+  gap: 6px;
+  padding-top: 8px;
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
 /* ---------- mood ---------- */
 .mood-strip { display: flex; gap: 8px; justify-content: space-between; }
 .mood-btn {

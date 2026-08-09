@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, alive, newRec, patch, softDelete, todayStr } from '../db'
+import { db, alive, newRec, patch, softDelete, todayStr, type PrepItem } from '../db'
+import OutlineEditor, {
+  parseOutline,
+  serializeOutline,
+  type OutlineLine,
+} from '../components/OutlineEditor'
 
 export default function SessionDetail() {
   const { id } = useParams()
@@ -10,7 +15,7 @@ export default function SessionDetail() {
 
   const [sessionId, setSessionId] = useState<string | null>(isNew ? null : (id ?? null))
   const [date, setDate] = useState(todayStr())
-  const [notes, setNotes] = useState('')
+  const [outline, setOutline] = useState<OutlineLine[]>(() => parseOutline(''))
   const [takeaways, setTakeaways] = useState('')
   const [practiceText, setPracticeText] = useState('')
   const [loaded, setLoaded] = useState(isNew)
@@ -21,16 +26,20 @@ export default function SessionDetail() {
     void db.sessions.get(id).then((s) => {
       if (s) {
         setDate(s.date)
-        setNotes(s.notes)
+        setOutline(parseOutline(s.notes))
         setTakeaways(s.takeaways)
       }
       setLoaded(true)
     })
   }, [id, isNew])
 
-  const openPrep = useLiveQuery(async () =>
-    (await db.prepItems.where('done').equals(0).toArray()).filter(alive),
-  )
+  const prepItems = useLiveQuery(async () => (await db.prepItems.toArray()).filter(alive))
+  const openTops = (prepItems ?? [])
+    .filter((p) => !p.parentId && !p.done)
+    .sort((a, b) => b.createdAt - a.createdAt)
+  const childrenOf = (pid: string) =>
+    (prepItems ?? []).filter((p) => p.parentId === pid).sort((a, b) => a.createdAt - b.createdAt)
+
   const sessionPractices = useLiveQuery(
     async () =>
       sessionId
@@ -40,6 +49,7 @@ export default function SessionDetail() {
   )
 
   async function save(): Promise<string> {
+    const notes = serializeOutline(outline)
     if (sessionId) {
       await patch(db.sessions, sessionId, { date, notes, takeaways })
       return sessionId
@@ -56,8 +66,13 @@ export default function SessionDetail() {
     setTimeout(() => setSavedFlash(false), 1500)
   }
 
-  async function markPrepCovered(prepId: string) {
-    await patch(db.prepItems, prepId, { done: 1, doneAt: Date.now() })
+  async function markCovered(item: PrepItem, cascade: boolean) {
+    await patch(db.prepItems, item.id, { done: 1, doneAt: Date.now() })
+    if (cascade) {
+      for (const child of childrenOf(item.id).filter((c) => !c.done)) {
+        await patch(db.prepItems, child.id, { done: 1, doneAt: Date.now() })
+      }
+    }
   }
 
   async function addPractice() {
@@ -84,15 +99,16 @@ export default function SessionDetail() {
           <span className="label-text">Session date</span>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </label>
-        <label className="field">
-          <span className="label-text">What came up</span>
-          <textarea
+        <div className="field">
+          <span className="label-text">
+            What came up <span className="hint">(Tab / ⇥ to nest bullets)</span>
+          </span>
+          <OutlineEditor
+            lines={outline}
+            onChange={setOutline}
             placeholder="What you talked about, what your therapist said, how it felt…"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={8}
           />
-        </label>
+        </div>
         <label className="field">
           <span className="label-text">Key takeaways</span>
           <textarea
@@ -114,14 +130,30 @@ export default function SessionDetail() {
         </div>
       </div>
 
-      {openPrep && openPrep.length > 0 && (
+      {openTops.length > 0 && (
         <div className="card">
           <h2>Prep topics — check off what you covered</h2>
-          {openPrep.map((p) => (
-            <label key={p.id} className="check-item">
-              <input type="checkbox" checked={false} onChange={() => markPrepCovered(p.id)} />
-              <span className="text">{p.text}</span>
-            </label>
+          {openTops.map((p) => (
+            <div key={p.id} className="topic-group">
+              <label className="check-item">
+                <input type="checkbox" checked={false} onChange={() => markCovered(p, true)} />
+                <span className="text">{p.text}</span>
+              </label>
+              {childrenOf(p.id).map((c) => (
+                <label key={c.id} className={`check-item sub-item ${c.done ? 'done' : ''}`}>
+                  <input
+                    type="checkbox"
+                    checked={!!c.done}
+                    onChange={() =>
+                      c.done
+                        ? patch(db.prepItems, c.id, { done: 0, doneAt: undefined })
+                        : markCovered(c, false)
+                    }
+                  />
+                  <span className="text">{c.text}</span>
+                </label>
+              ))}
+            </div>
           ))}
         </div>
       )}

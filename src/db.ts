@@ -12,6 +12,8 @@ export interface PrepItem extends BaseRec {
   text: string
   done: 0 | 1
   doneAt?: number
+  /** set on sub-items: the id of the parent topic */
+  parentId?: string
 }
 
 export interface Session extends BaseRec {

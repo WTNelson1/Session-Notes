@@ -7,7 +7,9 @@ export default function Today() {
   const today = todayStr()
 
   const openPrep = useLiveQuery(async () =>
-    (await db.prepItems.where('done').equals(0).toArray()).filter(alive),
+    (await db.prepItems.where('done').equals(0).toArray()).filter(
+      (p) => alive(p) && !p.parentId,
+    ),
   )
   const practices = useLiveQuery(async () =>
     (await db.practices.where('active').equals(1).toArray()).filter(alive),
