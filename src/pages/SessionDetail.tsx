@@ -20,6 +20,7 @@ export default function SessionDetail() {
   const [practiceText, setPracticeText] = useState('')
   const [loaded, setLoaded] = useState(isNew)
   const [savedFlash, setSavedFlash] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   useEffect(() => {
     if (isNew || !id) return
@@ -85,7 +86,6 @@ export default function SessionDetail() {
 
   async function remove() {
     if (!sessionId) return
-    if (!confirm('Delete this session note?')) return
     await softDelete(db.sessions, sessionId)
     navigate('/sessions')
   }
@@ -120,13 +120,26 @@ export default function SessionDetail() {
         </label>
         <div className="row-between">
           <button className="btn-primary" onClick={saveAndFlash}>
-            {savedFlash ? 'Saved ✓' : 'Save'}
+            {savedFlash ? 'saved ✓' : 'save'}
           </button>
-          {sessionId && (
-            <button className="btn-danger btn-small" onClick={remove}>
-              Delete
-            </button>
-          )}
+          {sessionId &&
+            (confirmingDelete ? (
+              <span className="row">
+                <button className="btn-danger btn-small" onClick={remove}>
+                  sure?
+                </button>
+                <button className="btn-small btn-ghost" onClick={() => setConfirmingDelete(false)}>
+                  ×
+                </button>
+              </span>
+            ) : (
+              <button
+                className="btn-small btn-ghost danger-hover"
+                onClick={() => setConfirmingDelete(true)}
+              >
+                delete
+              </button>
+            ))}
         </div>
       </div>
 
@@ -182,7 +195,7 @@ export default function SessionDetail() {
           <button type="submit">Add</button>
         </form>
         <p className="muted small" style={{ marginBottom: 0 }}>
-          Added practices appear on Today for daily tracking.
+          added practices appear on today for daily tracking.
         </p>
       </div>
     </div>

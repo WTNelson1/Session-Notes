@@ -58,8 +58,8 @@ export default function Insights() {
       <div className="card">
         <h2>AI insights</h2>
         <p className="muted">
-          Add your Anthropic API key in <Link to="/settings">Settings</Link> to enable insights.
-          Your notes are only sent to the Claude API when you run an analysis — never in the
+          add your anthropic api key in <Link to="/settings">settings</Link> to enable insights ·
+          your notes are only sent to the claude api when you run an analysis — never in the
           background.
         </p>
       </div>
@@ -83,7 +83,7 @@ export default function Insights() {
         <div className="preset-grid">
           {PRESETS.map((p) => (
             <button key={p.id} disabled={running} onClick={() => run(p.label, p.prompt)}>
-              {p.label}
+              ✦ {p.label.toLowerCase()}
             </button>
           ))}
         </div>
@@ -102,11 +102,11 @@ export default function Insights() {
             onChange={(e) => setCustom(e.target.value)}
           />
           <button type="submit" disabled={running || !custom.trim()}>
-            Ask
+            ✦ ask
           </button>
         </form>
         <p className="muted small" style={{ marginBottom: 0 }}>
-          Running an analysis sends the selected notes to Anthropic's Claude API.
+          running an analysis sends the selected notes to anthropic's claude api.
         </p>
       </div>
 
@@ -114,7 +114,7 @@ export default function Insights() {
         <div className="card">
           <div className="row-between">
             <h2 style={{ marginBottom: 0 }}>{activeTitle || 'Result'}</h2>
-            {running && <span className="muted small">thinking…</span>}
+            {running && <span className="muted small" style={{ color: 'var(--accent)' }}>✦ thinking…</span>}
           </div>
           {error && <p className="error-text">{error}</p>}
           <div ref={outputRef} className="insight-output" style={{ marginTop: 10 }}>

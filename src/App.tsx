@@ -19,7 +19,7 @@ function SyncButton() {
 
   async function run(silent = false) {
     if (!syncConfigured()) {
-      if (!silent) setError('Set up sync in Settings first.')
+      if (!silent) setError('set up sync in settings first.')
       return
     }
     setState('syncing')
@@ -30,7 +30,7 @@ function SyncButton() {
       setTimeout(() => setState('idle'), 2500)
     } catch (e) {
       setState('error')
-      if (!silent) setError(e instanceof Error ? e.message : 'Sync failed')
+      if (!silent) setError(e instanceof Error ? e.message.toLowerCase() : 'sync failed')
     }
   }
 
@@ -41,15 +41,16 @@ function SyncButton() {
   }, [])
 
   const label =
-    state === 'syncing' ? '…' : state === 'ok' ? '✓' : state === 'error' ? '⚠️' : '↻'
+    state === 'syncing' ? '…' : state === 'ok' ? '✓' : state === 'error' ? '✶' : '↻'
   return (
     <>
       <button
         className="btn-small btn-ghost"
-        title="Sync now"
+        title="sync now"
         onClick={() => run()}
         disabled={state === 'syncing'}
         aria-label="Sync"
+        style={state === 'error' ? { color: 'var(--danger)' } : undefined}
       >
         {label}
       </button>
@@ -57,6 +58,14 @@ function SyncButton() {
     </>
   )
 }
+
+const NAV = [
+  { to: '/', end: true, glyph: '◉', label: 'today' },
+  { to: '/prep', end: false, glyph: '✎', label: 'prep' },
+  { to: '/sessions', end: false, glyph: '≣', label: 'sessions' },
+  { to: '/practices', end: false, glyph: '↻', label: 'practices' },
+  { to: '/insights', end: false, glyph: '✦', label: 'insights' },
+]
 
 export default function App() {
   const location = useLocation()
@@ -73,11 +82,11 @@ export default function App() {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <h1>Anchor</h1>
+        <h1>anchor</h1>
         <div className="header-actions">
           <SyncButton />
           <Link to="/settings" className="btn btn-small btn-ghost" aria-label="Settings">
-            ⚙︎
+            ⚙
           </Link>
         </div>
       </header>
@@ -93,21 +102,17 @@ export default function App() {
       </Routes>
 
       <nav className="bottom-nav">
-        <NavLink to="/" end className={({ isActive }) => (isActive ? 'active' : '')}>
-          <span className="icon">☀️</span>Today
-        </NavLink>
-        <NavLink to="/prep" className={({ isActive }) => (isActive ? 'active' : '')}>
-          <span className="icon">📝</span>Prep
-        </NavLink>
-        <NavLink to="/sessions" className={({ isActive }) => (isActive ? 'active' : '')}>
-          <span className="icon">🗒️</span>Sessions
-        </NavLink>
-        <NavLink to="/practices" className={({ isActive }) => (isActive ? 'active' : '')}>
-          <span className="icon">🌱</span>Practices
-        </NavLink>
-        <NavLink to="/insights" className={({ isActive }) => (isActive ? 'active' : '')}>
-          <span className="icon">💡</span>Insights
-        </NavLink>
+        {NAV.map((n) => (
+          <NavLink
+            key={n.to}
+            to={n.to}
+            end={n.end}
+            className={({ isActive }) => (isActive ? 'active' : '')}
+          >
+            <span className="icon">{n.glyph}</span>
+            {n.label}
+          </NavLink>
+        ))}
       </nav>
     </div>
   )

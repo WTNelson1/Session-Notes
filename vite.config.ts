@@ -14,8 +14,8 @@ export default defineConfig({
         name: 'Anchor — Therapy Notes',
         short_name: 'Anchor',
         description: 'Private therapy notes, session prep, mood check-ins, and insights',
-        theme_color: '#2f6f6a',
-        background_color: '#f6f4ef',
+        theme_color: '#081915',
+        background_color: '#081915',
         display: 'standalone',
         start_url: '.',
         icons: [

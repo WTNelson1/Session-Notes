@@ -41,23 +41,23 @@ export default function Today() {
 
   return (
     <div>
-      <p className="muted" style={{ marginTop: 0 }}>
+      <p className="muted" style={{ marginTop: 0, textTransform: 'lowercase' }}>
         {dateLabel}
       </p>
 
       <div className="card">
-        <h2>How are you right now?</h2>
+        <h2>right now</h2>
         <MoodStrip />
         {todayMoods && todayMoods.length > 0 && (
           <p className="muted small" style={{ marginBottom: 0 }}>
-            Today: {todayMoods.map((m) => MOOD_FACES[m.score - 1]).join(' ')}
+            today · {todayMoods.map((m) => MOOD_FACES[m.score - 1]).join(' ')}
           </p>
         )}
       </div>
 
       {practices && practices.length > 0 && (
         <div className="card">
-          <h2>Today's practices</h2>
+          <h2>today's practices</h2>
           {practices.map((p) => {
             const done = !!todayLogs?.find((l) => l.practiceId === p.id)
             return (
@@ -72,9 +72,9 @@ export default function Today() {
 
       <div className="card">
         <div className="row-between">
-          <h2 style={{ marginBottom: 0 }}>For next session</h2>
-          <Link to="/prep" className="small" style={{ color: 'var(--accent)' }}>
-            All →
+          <h2 style={{ marginBottom: 0 }}>for next session</h2>
+          <Link to="/prep" className="muted small" style={{ color: 'var(--accent)', textDecoration: 'none' }}>
+            all →
           </Link>
         </div>
         {openPrep && openPrep.length > 0 ? (
@@ -85,23 +85,23 @@ export default function Today() {
               </div>
             ))}
             {openPrep.length > 4 && (
-              <p className="muted small">+{openPrep.length - 4} more</p>
+              <p className="muted small">＋{openPrep.length - 4} more</p>
             )}
           </div>
         ) : (
           <p className="muted small" style={{ marginBottom: 0, marginTop: 8 }}>
-            Nothing queued yet — jot things down as they come up during the week.
+            nothing queued — jot things down as they come up during the week.
           </p>
         )}
       </div>
 
       {lastSession && (
         <div className="card">
-          <h2>Last session</h2>
+          <h2>last session</h2>
           <Link to={`/sessions/${lastSession.id}`} className="session-item">
             <strong>{lastSession.date}</strong>
             <p className="preview" style={{ margin: '4px 0 0' }}>
-              {lastSession.notes || 'No notes'}
+              {lastSession.notes.replace(/^\s*-\s?/gm, '') || 'no notes'}
             </p>
           </Link>
         </div>

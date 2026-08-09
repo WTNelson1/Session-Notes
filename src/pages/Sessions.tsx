@@ -11,8 +11,8 @@ export default function Sessions() {
 
   return (
     <div>
-      <Link to="/sessions/new" className="btn btn-primary" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', marginBottom: 14 }}>
-        + New session note
+      <Link to="/sessions/new" className="btn btn-solid" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', marginBottom: 14 }}>
+        ＋ new session note
       </Link>
 
       {sessions?.map((s) => (
@@ -26,12 +26,12 @@ export default function Sessions() {
             })}
           </strong>
           <p className="preview" style={{ margin: '6px 0 0' }}>
-            {s.notes || 'No notes'}
+            {s.notes.replace(/^\s*-\s?/gm, '') || 'no notes'}
           </p>
         </Link>
       ))}
       {sessions && sessions.length === 0 && (
-        <p className="muted center">No session notes yet. After your next session, capture what came up while it's fresh.</p>
+        <p className="muted center">no session notes yet · capture what came up while it's fresh.</p>
       )}
     </div>
   )

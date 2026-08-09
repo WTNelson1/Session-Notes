@@ -146,8 +146,8 @@ export default function Prep() {
           ))}
           {open.length === 0 && (
             <p className="muted small">
-              Nothing queued. Add thoughts as they come up — use ＋ to add details under a topic,
-              and check things off once they've been discussed.
+              nothing queued · add thoughts as they come up — ＋ nests details under a topic ·
+              check things off once discussed.
             </p>
           )}
         </div>

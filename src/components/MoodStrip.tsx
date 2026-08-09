@@ -54,7 +54,7 @@ export default function MoodStrip({
           style={{ marginTop: 12 }}
         />
       )}
-      {saved && <p className="muted small center">Logged ✓</p>}
+      {saved && <p className="muted small center">logged ✓</p>}
     </div>
   )
 }

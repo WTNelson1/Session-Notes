@@ -97,7 +97,7 @@ export default function Practices() {
       })}
       {active.length === 0 && (
         <p className="muted center">
-          No active practices. Add homework from a session note, or add one above.
+          no active practices · add homework from a session note, or add one above.
         </p>
       )}
 
