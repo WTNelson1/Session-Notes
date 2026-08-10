@@ -366,44 +366,41 @@ label.field .label-text, .field .label-text {
 }
 .chip-x:hover { color: var(--danger); border: none; }
 
-/* focused family: rows of selectable word chips */
-.family-panel { }
-.family-row {
+/* focused family: glowing mind-map of nodes and branches */
+.node-group { display: flex; align-items: center; padding: 7px 0; }
+.node-connector { flex-shrink: 0; display: block; }
+.node-children {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--line-soft);
-}
-.family-row:last-child { border-bottom: none; }
-.word-chip {
-  display: inline-flex;
-  align-items: center;
+  flex-direction: column;
   gap: 7px;
+  align-items: flex-start;
+}
+.feel-node {
   font-family: var(--mono);
   font-size: 12px;
-  padding: 6px 12px;
+  height: 33px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 14px;
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--fam) 30%, transparent);
-  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--fam) 45%, transparent);
+  background: color-mix(in srgb, var(--fam) 12%, transparent);
   color: var(--text-dim);
-  transition: border-color 0.15s, background-color 0.15s, color 0.15s;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--fam) 16%, transparent);
+  transition: color 0.15s, border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
 }
-.word-chip:hover {
-  border-color: color-mix(in srgb, var(--fam) 60%, transparent);
+.feel-node:hover {
+  border-color: color-mix(in srgb, var(--fam) 75%, transparent);
   color: var(--text);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--fam) 30%, transparent);
 }
-.word-chip.strong {
-  background: color-mix(in srgb, var(--fam) 9%, transparent);
-  color: var(--text);
-}
-.word-chip.sel {
+.feel-node.sel {
   border-color: var(--accent);
-  background: color-mix(in srgb, var(--fam) 22%, transparent);
+  background: color-mix(in srgb, var(--fam) 30%, transparent);
   color: var(--text);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--fam) 45%, transparent);
 }
-.word-chip .feeling-dot { opacity: 0.9; }
+.feel-node.parent { font-size: 12.5px; }
 
 /* ---------- practices ---------- */
 .dot-row { display: flex; gap: 6px; }

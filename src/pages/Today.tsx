@@ -1,10 +1,14 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, alive, newRec, softDelete, todayStr } from '../db'
 import FeelingChips from '../components/FeelingChips'
+import FeelingsWheel from '../components/FeelingsWheel'
 
 export default function Today() {
   const today = todayStr()
+  const [selected, setSelected] = useState<string[]>([])
+  const [flash, setFlash] = useState(false)
 
   const openPrep = useLiveQuery(async () =>
     (await db.prepItems.where('done').equals(0).toArray()).filter(
@@ -29,6 +33,18 @@ export default function Today() {
     return all.sort((a, b) => b.date.localeCompare(a.date))[0]
   })
 
+  function toggleWord(word: string) {
+    setSelected((w) => (w.includes(word) ? w.filter((x) => x !== word) : [...w, word]))
+  }
+
+  async function logFeelings() {
+    if (selected.length === 0) return
+    await db.journal.add({ ...newRec(), at: Date.now(), words: selected, text: '' })
+    setSelected([])
+    setFlash(true)
+    setTimeout(() => setFlash(false), 2000)
+  }
+
   async function togglePractice(practiceId: string) {
     const existing = todayLogs?.find((l) => l.practiceId === practiceId)
     if (existing) await softDelete(db.practiceLogs, existing.id)
@@ -52,24 +68,20 @@ export default function Today() {
       <div className="card">
         <div className="row-between">
           <h2 style={{ marginBottom: 0 }}>right now</h2>
-          {todayEntries && todayEntries.length > 0 && (
-            <span className="muted small">{todayEntries.length} today</span>
+          {todayWords.length > 0 && (
+            <span className="muted small">today · {todayWords.length} named</span>
           )}
         </div>
-        {todayWords.length > 0 ? (
-          <FeelingChips words={todayWords} />
-        ) : (
-          <p className="muted small" style={{ margin: '8px 0 10px' }}>
-            nothing named yet today.
-          </p>
+        {todayWords.length > 0 && <FeelingChips words={todayWords} />}
+        <div style={{ marginTop: 10 }}>
+          <FeelingsWheel selected={selected} onToggle={toggleWord} />
+        </div>
+        <FeelingChips words={selected} onRemove={toggleWord} />
+        {(selected.length > 0 || flash) && (
+          <button className="btn-primary" style={{ marginTop: 10 }} onClick={logFeelings}>
+            {flash ? 'logged ✓' : 'log it'}
+          </button>
         )}
-        <Link
-          to="/journal/new"
-          className="btn btn-primary"
-          style={{ display: 'inline-block', textDecoration: 'none', marginTop: 8 }}
-        >
-          ✎ check in
-        </Link>
       </div>
 
       {practices && practices.length > 0 && (

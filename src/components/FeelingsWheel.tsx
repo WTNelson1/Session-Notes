@@ -34,28 +34,60 @@ function radialLabel(mid: number, rIn: number, rOut: number) {
   return { x: p.x, y: p.y, rot, anchor: 'start' as const }
 }
 
-function WordChip({
+function FeelNode({
   word,
   color,
   selected,
-  strong = false,
+  parent = false,
   onClick,
 }: {
   word: string
   color: string
   selected: boolean
-  strong?: boolean
+  parent?: boolean
   onClick: () => void
 }) {
   return (
     <button
-      className={`word-chip ${selected ? 'sel' : ''} ${strong ? 'strong' : ''}`}
+      className={`feel-node ${selected ? 'sel' : ''} ${parent ? 'parent' : ''}`}
       style={{ '--fam': color } as CSSProperties}
       onClick={onClick}
     >
-      <span className="feeling-dot" style={{ background: color }} />
       {word}
     </button>
+  )
+}
+
+const PILL_H = 33
+const PILL_GAP = 7
+
+/** smooth bezier branches from the parent node to each child node */
+function Connector({ n, color }: { n: number; color: string }) {
+  const h = n * PILL_H + (n - 1) * PILL_GAP
+  const y0 = h / 2
+  return (
+    <svg
+      className="node-connector"
+      width={34}
+      height={h}
+      viewBox={`0 0 34 ${h}`}
+      style={{ filter: `drop-shadow(0 0 3px ${color}59)` }}
+      aria-hidden
+    >
+      {Array.from({ length: n }, (_, i) => {
+        const y1 = PILL_H / 2 + i * (PILL_H + PILL_GAP)
+        return (
+          <path
+            key={i}
+            d={`M 0 ${y0} C 18 ${y0}, 16 ${y1}, 34 ${y1}`}
+            fill="none"
+            stroke={color}
+            strokeOpacity={0.45}
+            strokeWidth={1.5}
+          />
+        )
+      })}
+    </svg>
   )
 }
 
@@ -126,40 +158,43 @@ export default function FeelingsWheel({
     )
   }
 
-  // focused view: the family's full vocabulary as rows of chips —
-  // nuance on the left, its precise words after it
+  // focused view: the family as a glowing mind-map — nuance node on the
+  // left, curved branches out to its precise words
   return (
     <div className="family-panel">
-      <div className="row-between" style={{ marginBottom: 4 }}>
+      <div className="row-between" style={{ marginBottom: 10 }}>
         <button className="btn-small btn-ghost" onClick={() => setFocused(null)}>
           ← all feelings
         </button>
-        <WordChip
+        <FeelNode
           word={focused.name}
           color={focused.color}
           selected={isSel(focused.name)}
-          strong
+          parent
           onClick={() => onToggle(focused.name)}
         />
       </div>
       {focused.children.map((m) => (
-        <div key={m.name} className="family-row">
-          <WordChip
+        <div key={m.name} className="node-group">
+          <FeelNode
             word={m.name}
             color={focused.color}
             selected={isSel(m.name)}
-            strong
+            parent
             onClick={() => onToggle(m.name)}
           />
-          {m.children.map((w) => (
-            <WordChip
-              key={w}
-              word={w}
-              color={focused.color}
-              selected={isSel(w)}
-              onClick={() => onToggle(w)}
-            />
-          ))}
+          <Connector n={m.children.length} color={focused.color} />
+          <div className="node-children">
+            {m.children.map((w) => (
+              <FeelNode
+                key={w}
+                word={w}
+                color={focused.color}
+                selected={isSel(w)}
+                onClick={() => onToggle(w)}
+              />
+            ))}
+          </div>
         </div>
       ))}
     </div>
