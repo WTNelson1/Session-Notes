@@ -137,9 +137,9 @@ export default function Settings() {
       </div>
 
       <div className="card">
-        <h2>Mood check-in shortcut</h2>
+        <h2>feelings check-in shortcut</h2>
         <p className="muted small">
-          This link opens straight to a one-tap mood log:
+          this link opens straight to the feelings wheel:
         </p>
         <div className="row">
           <code style={{ flex: 1 }}>{checkinUrl}</code>

@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, alive, newRec, softDelete, todayStr } from '../db'
-import MoodStrip, { MOOD_FACES } from '../components/MoodStrip'
+import FeelingChips from '../components/FeelingChips'
 
 export default function Today() {
   const today = todayStr()
@@ -17,10 +17,12 @@ export default function Today() {
   const todayLogs = useLiveQuery(async () =>
     (await db.practiceLogs.where('date').equals(today).toArray()).filter(alive),
   )
-  const todayMoods = useLiveQuery(async () => {
+  const todayEntries = useLiveQuery(async () => {
     const start = new Date()
     start.setHours(0, 0, 0, 0)
-    return (await db.moods.where('at').aboveOrEqual(start.getTime()).toArray()).filter(alive)
+    return (await db.journal.where('at').aboveOrEqual(start.getTime()).toArray())
+      .filter(alive)
+      .sort((a, b) => a.at - b.at)
   })
   const lastSession = useLiveQuery(async () => {
     const all = (await db.sessions.toArray()).filter(alive)
@@ -39,6 +41,8 @@ export default function Today() {
     day: 'numeric',
   })
 
+  const todayWords = [...new Set(todayEntries?.flatMap((e) => e.words) ?? [])]
+
   return (
     <div>
       <p className="muted" style={{ marginTop: 0, textTransform: 'lowercase' }}>
@@ -46,27 +50,47 @@ export default function Today() {
       </p>
 
       <div className="card">
-        <h2>right now</h2>
-        <MoodStrip />
-        {todayMoods && todayMoods.length > 0 && (
-          <p className="muted small" style={{ marginBottom: 0 }}>
-            today · {todayMoods.map((m) => MOOD_FACES[m.score - 1]).join(' ')}
+        <div className="row-between">
+          <h2 style={{ marginBottom: 0 }}>right now</h2>
+          {todayEntries && todayEntries.length > 0 && (
+            <span className="muted small">{todayEntries.length} today</span>
+          )}
+        </div>
+        {todayWords.length > 0 ? (
+          <FeelingChips words={todayWords} />
+        ) : (
+          <p className="muted small" style={{ margin: '8px 0 10px' }}>
+            nothing named yet today.
           </p>
         )}
+        <Link
+          to="/journal/new"
+          className="btn btn-primary"
+          style={{ display: 'inline-block', textDecoration: 'none', marginTop: 8 }}
+        >
+          ✎ check in
+        </Link>
       </div>
 
       {practices && practices.length > 0 && (
         <div className="card">
-          <h2>today's practices</h2>
-          {practices.map((p) => {
-            const done = !!todayLogs?.find((l) => l.practiceId === p.id)
-            return (
-              <label key={p.id} className={`check-item ${done ? 'done' : ''}`}>
-                <input type="checkbox" checked={done} onChange={() => togglePractice(p.id)} />
-                <span className="text">{p.title}</span>
-              </label>
-            )
-          })}
+          <div className="row-between">
+            <h2 style={{ marginBottom: 0 }}>today's practices</h2>
+            <Link to="/practices" className="muted small" style={{ color: 'var(--accent)', textDecoration: 'none' }}>
+              manage →
+            </Link>
+          </div>
+          <div style={{ marginTop: 8 }}>
+            {practices.map((p) => {
+              const done = !!todayLogs?.find((l) => l.practiceId === p.id)
+              return (
+                <label key={p.id} className={`check-item ${done ? 'done' : ''}`}>
+                  <input type="checkbox" checked={done} onChange={() => togglePractice(p.id)} />
+                  <span className="text">{p.title}</span>
+                </label>
+              )
+            })}
+          </div>
         </div>
       )}
 

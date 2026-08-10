@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { db, alive, todayStr } from './db'
 
-const SYSTEM = `You are a thoughtful companion inside a private therapy-notes app. The user will share their own journal: therapy session notes, session-prep topics, mood check-ins, and between-session practices.
+const SYSTEM = `You are a thoughtful companion inside a private therapy-notes app. The user will share their own journal: therapy session notes, session-prep topics, feelings check-ins from an emotion wheel (they are practicing naming feelings precisely — acknowledge and reinforce that skill), journal entries, and between-session practices.
 
 Your job is to help them see their own material more clearly:
 - Find recurring themes, patterns, and connections across entries, and cite the dates you draw from.
@@ -26,10 +26,16 @@ export const PRESETS: InsightPreset[] = [
       'What themes and patterns recur across my notes? Group them, cite the dates they show up, and note anything I might not have connected myself.',
   },
   {
+    id: 'feelings',
+    label: 'Feelings patterns',
+    prompt:
+      'Look at the feelings I selected from the wheel across my check-ins. Which families dominate? Which feelings co-occur? What situations (from journal text and session notes) seem to trigger which feelings? Where does my feelings vocabulary seem narrow or avoided?',
+  },
+  {
     id: 'progress',
     label: 'Progress over time',
     prompt:
-      'Looking across time: what has shifted, improved, or gotten harder? Use my mood check-ins and session notes as evidence.',
+      'Looking across time: what has shifted, improved, or gotten harder? Use my feelings check-ins, journal entries, and session notes as evidence.',
   },
   {
     id: 'next-session',
@@ -58,6 +64,10 @@ export async function buildContext(sinceDays: number | null): Promise<string> {
     .filter(alive)
     .filter((m) => m.at >= cutoff)
     .sort((a, b) => a.at - b.at)
+  const journal = (await db.journal.toArray())
+    .filter(alive)
+    .filter((j) => j.at >= cutoff)
+    .sort((a, b) => a.at - b.at)
   const practices = (await db.practices.toArray()).filter(alive)
   const logs = (await db.practiceLogs.toArray())
     .filter(alive)
@@ -74,8 +84,19 @@ export async function buildContext(sinceDays: number | null): Promise<string> {
     }
   }
 
+  if (journal.length) {
+    parts.push('## Feelings check-ins & journal entries (feelings named from an emotion wheel)')
+    for (const j of journal) {
+      const d = new Date(j.at)
+      const stamp = `${todayStr(d)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+      const words = j.words.length ? `feelings: ${j.words.join(', ')}` : ''
+      const text = j.text.trim()
+      parts.push(`### ${stamp}${words ? `\n${words}` : ''}${text ? `\n${text}` : ''}`)
+    }
+  }
+
   if (moods.length) {
-    parts.push('## Mood check-ins (1 = very low, 5 = great)')
+    parts.push('## Older mood check-ins (legacy 1-5 scale, 1 = very low)')
     for (const m of moods) {
       const d = new Date(m.at)
       const stamp = `${todayStr(d)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`

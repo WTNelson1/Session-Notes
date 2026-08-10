@@ -8,6 +8,8 @@ import Practices from './pages/Practices'
 import Insights from './pages/Insights'
 import Settings from './pages/Settings'
 import Checkin from './pages/Checkin'
+import Journal from './pages/Journal'
+import JournalEntry from './pages/JournalEntry'
 import { initAutoSync, syncNow } from './sync'
 import { syncConfigured } from './settings'
 
@@ -66,9 +68,9 @@ function SyncButton() {
 
 const NAV = [
   { to: '/', end: true, glyph: '◉', label: 'today' },
-  { to: '/prep', end: false, glyph: '✎', label: 'prep' },
+  { to: '/journal', end: false, glyph: '✎', label: 'journal' },
+  { to: '/prep', end: false, glyph: '☰', label: 'prep' },
   { to: '/sessions', end: false, glyph: '≣', label: 'sessions' },
-  { to: '/practices', end: false, glyph: '↻', label: 'practices' },
   { to: '/insights', end: false, glyph: '✦', label: 'insights' },
 ]
 
@@ -98,6 +100,8 @@ export default function App() {
 
       <Routes>
         <Route path="/" element={<Today />} />
+        <Route path="/journal" element={<Journal />} />
+        <Route path="/journal/:id" element={<JournalEntry />} />
         <Route path="/prep" element={<Prep />} />
         <Route path="/sessions" element={<Sessions />} />
         <Route path="/sessions/:id" element={<SessionDetail />} />

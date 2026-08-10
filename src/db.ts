@@ -34,10 +34,17 @@ export interface PracticeLog extends BaseRec {
   date: string // YYYY-MM-DD
 }
 
+/** legacy 1-5 mood check-ins — kept so old synced data still round-trips */
 export interface Mood extends BaseRec {
   at: number
   score: number // 1..5
   note: string
+}
+
+export interface JournalEntry extends BaseRec {
+  at: number
+  words: string[] // selected feelings-wheel words
+  text: string
 }
 
 export interface Insight extends BaseRec {
@@ -52,6 +59,7 @@ class AnchorDB extends Dexie {
   practiceLogs!: Table<PracticeLog, string>
   moods!: Table<Mood, string>
   insights!: Table<Insight, string>
+  journal!: Table<JournalEntry, string>
 
   constructor() {
     super('anchor')
@@ -62,6 +70,9 @@ class AnchorDB extends Dexie {
       practiceLogs: 'id, practiceId, date, updatedAt',
       moods: 'id, at, updatedAt',
       insights: 'id, createdAt, updatedAt',
+    })
+    this.version(2).stores({
+      journal: 'id, at, updatedAt',
     })
   }
 }
@@ -75,6 +86,7 @@ export const TABLES = [
   'practiceLogs',
   'moods',
   'insights',
+  'journal',
 ] as const
 export type TableName = (typeof TABLES)[number]
 

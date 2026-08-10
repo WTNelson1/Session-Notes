@@ -329,20 +329,40 @@ label.field .label-text, .field .label-text {
   border-top: 1px solid var(--line-soft);
 }
 
-/* ---------- mood ---------- */
-.mood-strip { display: flex; gap: 8px; justify-content: space-between; }
-.mood-btn {
-  flex: 1;
-  font-size: 23px;
-  padding: 9px 0;
-  border-radius: 8px;
-  background: var(--bg-elev-2);
+/* ---------- feelings wheel ---------- */
+.wheel-wrap { max-width: 400px; margin: 0 auto; }
+.wheel-wrap svg { display: block; width: 100%; height: auto; }
+.wheel-wrap > button { margin-bottom: 4px; }
+
+.chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.feeling-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
   border: 1px solid var(--line-soft);
-  filter: saturate(0.85);
+  border-radius: 999px;
+  padding: 3px 9px;
+  background: var(--bg-elev-2);
 }
-.mood-btn:hover { border-color: var(--line); }
-.mood-btn.selected { border-color: var(--accent-soft); background: rgba(122, 214, 192, 0.08); }
-.mood-big .mood-btn { font-size: 36px; padding: 16px 0; }
+.feeling-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.chip-x {
+  border: none;
+  background: transparent;
+  color: var(--text-mute);
+  padding: 0 0 0 2px;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+.chip-x:hover { color: var(--danger); border: none; }
 
 /* ---------- practices ---------- */
 .dot-row { display: flex; gap: 6px; }
