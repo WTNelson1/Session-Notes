@@ -13,7 +13,7 @@ interface Options {
 
 export function initBackground(opts: Partial<Options> = {}) {
   const o: Options = {
-    accent: [122, 214, 192],
+    accent: [232, 182, 76],
     count: 48,
     linkDist: 180,
     speed: 0.18,

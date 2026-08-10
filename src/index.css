@@ -1,15 +1,17 @@
 :root {
-  --bg: #081915;
-  --bg-elev: #0e2520;
-  --bg-elev-2: #143029;
-  --line: #244038;
-  --line-soft: #19302a;
-  --text: #dfeee8;
-  --text-dim: #8fb8ad;
-  --text-mute: #5a7d75;
-  --accent: #7ad6c0;
-  --accent-soft: #3a9985;
-  --accent-glow: rgba(122, 214, 192, 0.45);
+  /* "harbor at night" — indigo-tinted neutrals, brass accent.
+     Same design language as Helm (see docs/), deliberately different hue. */
+  --bg: #131523;
+  --bg-elev: #1a1d30;
+  --bg-elev-2: #22273f;
+  --line: #363d61;
+  --line-soft: #242a47;
+  --text: #e7e9f3;
+  --text-dim: #9aa2c6;
+  --text-mute: #667097;
+  --accent: #e8b64c;
+  --accent-soft: #a5832f;
+  --accent-glow: rgba(232, 182, 76, 0.45);
   --danger: #e88a7a;
   --radius: 8px;
   --nav-h: 58px;
@@ -25,8 +27,8 @@ html, body {
   padding: 0;
   background-color: var(--bg);
   background-image:
-    radial-gradient(circle at 12% -5%, rgba(122, 214, 192, 0.05), transparent 40%),
-    radial-gradient(circle at 90% 0%, rgba(122, 214, 192, 0.035), transparent 35%);
+    radial-gradient(circle at 12% -5%, rgba(232, 182, 76, 0.045), transparent 40%),
+    radial-gradient(circle at 90% 0%, rgba(232, 182, 76, 0.03), transparent 35%);
   background-attachment: fixed;
   color: var(--text);
   font-family: var(--sans);
@@ -108,7 +110,7 @@ canvas.grid-bg {
   z-index: 20;
   display: flex;
   justify-content: space-around;
-  background: rgba(8, 25, 21, 0.9);
+  background: rgba(19, 21, 35, 0.9);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-top: 1px solid var(--line-soft);
@@ -190,7 +192,7 @@ button:hover, .btn:hover { border-color: var(--line); color: var(--text); }
   background: transparent;
 }
 .btn-primary:hover {
-  background: rgba(122, 214, 192, 0.08);
+  background: rgba(232, 182, 76, 0.08);
   border-color: var(--accent-soft);
   color: var(--accent);
 }
@@ -363,6 +365,45 @@ label.field .label-text, .field .label-text {
   cursor: pointer;
 }
 .chip-x:hover { color: var(--danger); border: none; }
+
+/* focused family: rows of selectable word chips */
+.family-panel { }
+.family-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.family-row:last-child { border-bottom: none; }
+.word-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--fam) 30%, transparent);
+  background: transparent;
+  color: var(--text-dim);
+  transition: border-color 0.15s, background-color 0.15s, color 0.15s;
+}
+.word-chip:hover {
+  border-color: color-mix(in srgb, var(--fam) 60%, transparent);
+  color: var(--text);
+}
+.word-chip.strong {
+  background: color-mix(in srgb, var(--fam) 9%, transparent);
+  color: var(--text);
+}
+.word-chip.sel {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--fam) 22%, transparent);
+  color: var(--text);
+}
+.word-chip .feeling-dot { opacity: 0.9; }
 
 /* ---------- practices ---------- */
 .dot-row { display: flex; gap: 6px; }

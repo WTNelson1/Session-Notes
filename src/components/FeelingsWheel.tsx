@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import { WHEEL, type CoreFamily } from '../feelings'
 
 const CX = 180
@@ -25,9 +25,7 @@ function arcPath(r1: number, r2: number, startDeg: number, endDeg: number) {
   ].join(' ')
 }
 
-/** radial label placement — flipped on the left half so text is never upside down.
- * Anchor is always 'start': unflipped text reads inner→outer, flipped reads
- * outer→inner, keeping the string inside the ring on both halves. */
+/** radial label placement — flipped on the left half so text is never upside down */
 function radialLabel(mid: number, rIn: number, rOut: number) {
   const flip = mid > 180
   const r0 = flip ? rOut - 7 : rIn + 7
@@ -36,53 +34,28 @@ function radialLabel(mid: number, rIn: number, rOut: number) {
   return { x: p.x, y: p.y, rot, anchor: 'start' as const }
 }
 
-function Segment({
-  r1,
-  r2,
-  start,
-  end,
+function WordChip({
+  word,
   color,
-  label,
-  fontSize,
   selected,
+  strong = false,
   onClick,
 }: {
-  r1: number
-  r2: number
-  start: number
-  end: number
+  word: string
   color: string
-  label: string
-  fontSize: number
   selected: boolean
+  strong?: boolean
   onClick: () => void
 }) {
-  const mid = (start + end) / 2
-  const lab = radialLabel(mid, r1, r2)
   return (
-    <g onClick={onClick} style={{ cursor: 'pointer' }}>
-      <path
-        d={arcPath(r1, r2, start + 0.4, end - 0.4)}
-        fill={color}
-        fillOpacity={selected ? 0.38 : 0.1}
-        stroke={selected ? 'var(--accent)' : color}
-        strokeOpacity={selected ? 1 : 0.35}
-        strokeWidth={selected ? 1.5 : 1}
-      />
-      <text
-        x={lab.x}
-        y={lab.y}
-        transform={`rotate(${lab.rot} ${lab.x} ${lab.y})`}
-        textAnchor={lab.anchor}
-        dominantBaseline="middle"
-        fontSize={fontSize}
-        fontFamily="var(--mono)"
-        fill={selected ? 'var(--text)' : 'var(--text-dim)'}
-        style={{ pointerEvents: 'none', userSelect: 'none' }}
-      >
-        {label}
-      </text>
-    </g>
+    <button
+      className={`word-chip ${selected ? 'sel' : ''} ${strong ? 'strong' : ''}`}
+      style={{ '--fam': color } as CSSProperties}
+      onClick={onClick}
+    >
+      <span className="feeling-dot" style={{ background: color }} />
+      {word}
+    </button>
   )
 }
 
@@ -153,78 +126,42 @@ export default function FeelingsWheel({
     )
   }
 
-  // focused view: center = core word, inner ring = nuances, outer ring = precise words
-  const mids = focused.children
-  const step = 360 / mids.length
+  // focused view: the family's full vocabulary as rows of chips —
+  // nuance on the left, its precise words after it
   return (
-    <div className="wheel-wrap">
-      <button className="btn-small btn-ghost" onClick={() => setFocused(null)}>
-        ← all feelings
-      </button>
-      <svg viewBox="0 0 360 360">
-        {mids.map((m, i) => {
-          const start = i * step
-          const end = start + step
-          const segs = m.children.map((w, j) => {
-            const wStart = start + (j * step) / m.children.length
-            const wEnd = start + ((j + 1) * step) / m.children.length
-            return (
-              <Segment
-                key={w + j}
-                r1={104}
-                r2={174}
-                start={wStart}
-                end={wEnd}
-                color={focused.color}
-                label={w}
-                fontSize={9.5}
-                selected={isSel(w)}
-                onClick={() => onToggle(w)}
-              />
-            )
-          })
-          return (
-            <g key={m.name}>
-              <Segment
-                r1={50}
-                r2={100}
-                start={start}
-                end={end}
-                color={focused.color}
-                label={m.name}
-                fontSize={10.5}
-                selected={isSel(m.name)}
-                onClick={() => onToggle(m.name)}
-              />
-              {segs}
-            </g>
-          )
-        })}
-        <g onClick={() => onToggle(focused.name)} style={{ cursor: 'pointer' }}>
-          <circle
-            cx={CX}
-            cy={CY}
-            r={44}
-            fill={focused.color}
-            fillOpacity={isSel(focused.name) ? 0.38 : 0.12}
-            stroke={isSel(focused.name) ? 'var(--accent)' : focused.color}
-            strokeOpacity={isSel(focused.name) ? 1 : 0.4}
-            strokeWidth={isSel(focused.name) ? 1.5 : 1}
+    <div className="family-panel">
+      <div className="row-between" style={{ marginBottom: 4 }}>
+        <button className="btn-small btn-ghost" onClick={() => setFocused(null)}>
+          ← all feelings
+        </button>
+        <WordChip
+          word={focused.name}
+          color={focused.color}
+          selected={isSel(focused.name)}
+          strong
+          onClick={() => onToggle(focused.name)}
+        />
+      </div>
+      {focused.children.map((m) => (
+        <div key={m.name} className="family-row">
+          <WordChip
+            word={m.name}
+            color={focused.color}
+            selected={isSel(m.name)}
+            strong
+            onClick={() => onToggle(m.name)}
           />
-          <text
-            x={CX}
-            y={CY}
-            textAnchor="middle"
-            dominantBaseline="middle"
-            fontSize={12}
-            fontFamily="var(--mono)"
-            fill="var(--text)"
-            style={{ pointerEvents: 'none', userSelect: 'none' }}
-          >
-            {focused.name}
-          </text>
-        </g>
-      </svg>
+          {m.children.map((w) => (
+            <WordChip
+              key={w}
+              word={w}
+              color={focused.color}
+              selected={isSel(w)}
+              onClick={() => onToggle(w)}
+            />
+          ))}
+        </div>
+      ))}
     </div>
   )
 }
