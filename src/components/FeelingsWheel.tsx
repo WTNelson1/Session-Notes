@@ -39,18 +39,26 @@ function FeelNode({
   color,
   selected,
   parent = false,
+  widthCh,
   onClick,
 }: {
   word: string
   color: string
   selected: boolean
   parent?: boolean
+  /** uniform column width, in ch of the longest word in the column */
+  widthCh?: number
   onClick: () => void
 }) {
+  const style: CSSProperties = { '--fam': color } as CSSProperties
+  if (widthCh) {
+    style.width = `calc(${widthCh}ch + 30px)`
+    style.justifyContent = 'center'
+  }
   return (
     <button
       className={`feel-node ${selected ? 'sel' : ''} ${parent ? 'parent' : ''}`}
-      style={{ '--fam': color } as CSSProperties}
+      style={style}
       onClick={onClick}
     >
       {word}
@@ -159,7 +167,10 @@ export default function FeelingsWheel({
   }
 
   // focused view: the family as a glowing mind-map — nuance node on the
-  // left, curved branches out to its precise words
+  // left, curved branches out to its precise words. Columns are sized to
+  // the family's longest word so the pills align.
+  const parentW = Math.max(...focused.children.map((m) => m.name.length))
+  const childW = Math.max(...focused.children.flatMap((m) => m.children.map((w) => w.length)))
   return (
     <div className="family-panel">
       <div className="row-between" style={{ marginBottom: 10 }}>
@@ -181,6 +192,7 @@ export default function FeelingsWheel({
             color={focused.color}
             selected={isSel(m.name)}
             parent
+            widthCh={parentW}
             onClick={() => onToggle(m.name)}
           />
           <Connector n={m.children.length} color={focused.color} />
@@ -191,6 +203,7 @@ export default function FeelingsWheel({
                 word={w}
                 color={focused.color}
                 selected={isSel(w)}
+                widthCh={childW}
                 onClick={() => onToggle(w)}
               />
             ))}
