@@ -15,43 +15,8 @@ export interface CoreFamily {
 
 export const WHEEL: CoreFamily[] = [
   {
-    name: 'happy',
-    color: '#4cc38a',
-    children: [
-      { name: 'playful', children: ['aroused', 'cheeky'] },
-      { name: 'content', children: ['free', 'joyful'] },
-      { name: 'interested', children: ['curious', 'inquisitive'] },
-      { name: 'proud', children: ['successful', 'confident'] },
-      { name: 'accepted', children: ['respected', 'valued'] },
-      { name: 'powerful', children: ['courageous', 'creative'] },
-      { name: 'peaceful', children: ['loving', 'thankful'] },
-      { name: 'trusting', children: ['sensitive', 'intimate'] },
-      { name: 'optimistic', children: ['hopeful', 'inspired'] },
-    ],
-  },
-  {
-    name: 'surprised',
-    color: '#08b0d5',
-    children: [
-      { name: 'startled', children: ['shocked', 'dismayed'] },
-      { name: 'confused', children: ['disillusioned', 'perplexed'] },
-      { name: 'amazed', children: ['astonished', 'in awe'] },
-      { name: 'excited', children: ['eager', 'energetic'] },
-    ],
-  },
-  {
-    name: 'bad',
-    color: '#94a3b8',
-    children: [
-      { name: 'bored', children: ['indifferent', 'apathetic'] },
-      { name: 'busy', children: ['pressured', 'rushed'] },
-      { name: 'stressed', children: ['overwhelmed', 'out of control'] },
-      { name: 'tired', children: ['sleepy', 'unfocused'] },
-    ],
-  },
-  {
     name: 'fearful',
-    color: '#b094f0',
+    color: '#e8825a',
     children: [
       { name: 'scared', children: ['helpless', 'frightened'] },
       { name: 'anxious', children: ['overwhelmed', 'worried'] },
@@ -63,7 +28,7 @@ export const WHEEL: CoreFamily[] = [
   },
   {
     name: 'angry',
-    color: '#e8825a',
+    color: '#d4243f',
     children: [
       { name: 'let down', children: ['betrayed', 'resentful'] },
       { name: 'humiliated', children: ['disrespected', 'ridiculed'] },
@@ -77,7 +42,7 @@ export const WHEEL: CoreFamily[] = [
   },
   {
     name: 'disgusted',
-    color: '#97c05c',
+    color: '#94a3b8',
     children: [
       { name: 'disapproving', children: ['judgmental', 'embarrassed'] },
       { name: 'disappointed', children: ['appalled', 'revolted'] },
@@ -95,6 +60,41 @@ export const WHEEL: CoreFamily[] = [
       { name: 'guilty', children: ['ashamed', 'remorseful'] },
       { name: 'depressed', children: ['empty', 'inferior'] },
       { name: 'hurt', children: ['disappointed', 'embarrassed'] },
+    ],
+  },
+  {
+    name: 'happy',
+    color: '#e0a44e',
+    children: [
+      { name: 'playful', children: ['aroused', 'cheeky'] },
+      { name: 'content', children: ['free', 'joyful'] },
+      { name: 'interested', children: ['curious', 'inquisitive'] },
+      { name: 'proud', children: ['successful', 'confident'] },
+      { name: 'accepted', children: ['respected', 'valued'] },
+      { name: 'powerful', children: ['courageous', 'creative'] },
+      { name: 'peaceful', children: ['loving', 'thankful'] },
+      { name: 'trusting', children: ['sensitive', 'intimate'] },
+      { name: 'optimistic', children: ['hopeful', 'inspired'] },
+    ],
+  },
+  {
+    name: 'surprised',
+    color: '#b094f0',
+    children: [
+      { name: 'startled', children: ['shocked', 'dismayed'] },
+      { name: 'confused', children: ['disillusioned', 'perplexed'] },
+      { name: 'amazed', children: ['astonished', 'awe'] },
+      { name: 'excited', children: ['eager', 'energetic'] },
+    ],
+  },
+  {
+    name: 'bad',
+    color: '#4cc38a',
+    children: [
+      { name: 'bored', children: ['indifferent', 'apathetic'] },
+      { name: 'busy', children: ['pressured', 'rushed'] },
+      { name: 'stressed', children: ['overwhelmed', 'out of control'] },
+      { name: 'tired', children: ['sleepy', 'unfocused'] },
     ],
   },
 ]
