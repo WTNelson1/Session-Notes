@@ -8,7 +8,7 @@ import Practices from './pages/Practices'
 import Insights from './pages/Insights'
 import Settings from './pages/Settings'
 import Checkin from './pages/Checkin'
-import { syncNow } from './sync'
+import { initAutoSync, syncNow } from './sync'
 import { syncConfigured } from './settings'
 
 type SyncState = 'idle' | 'syncing' | 'ok' | 'error'
@@ -35,8 +35,13 @@ function SyncButton() {
   }
 
   useEffect(() => {
-    // pull the latest from other devices on app open
+    // pull the latest from other devices on app open, then push every local
+    // change automatically (debounced) so nothing is lost between devices
     void run(true)
+    initAutoSync(() => {
+      setState('ok')
+      setTimeout(() => setState('idle'), 2000)
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

@@ -4,7 +4,7 @@
 
 import { db, TABLES, type BaseRec, type TableName } from './db'
 import { encryptJSON, decryptJSON } from './crypto'
-import { getSetting, setSetting } from './settings'
+import { getSetting, setSetting, syncConfigured } from './settings'
 
 const FILE_NAME = 'anchor-data.enc.json'
 const API = 'https://api.github.com'
@@ -89,6 +89,53 @@ async function createGist(token: string, content: string): Promise<string> {
   return gist.id as string
 }
 
+// ---------- auto-sync ----------
+// Any local write schedules a debounced background sync, so edits reach the
+// gist without the user ever pressing the sync button. `suppress` prevents
+// sync's own bulkPut writes from re-triggering a sync loop.
+
+let syncTimer: ReturnType<typeof setTimeout> | undefined
+let suppress = false
+
+export function scheduleAutoSync(onDone?: () => void) {
+  if (suppress || !syncConfigured()) return
+  clearTimeout(syncTimer)
+  syncTimer = setTimeout(() => {
+    syncTimer = undefined
+    syncNow()
+      .then(() => onDone?.())
+      .catch(() => {}) // offline or transient — next change or app-open retries
+  }, 4000)
+}
+
+let autoSyncStarted = false
+export function initAutoSync(onDone?: () => void) {
+  if (autoSyncStarted) return
+  autoSyncStarted = true
+  for (const t of TABLES) {
+    const table = db.table(t)
+    table.hook('creating', () => {
+      scheduleAutoSync(onDone)
+    })
+    table.hook('updating', () => {
+      scheduleAutoSync(onDone)
+    })
+    table.hook('deleting', () => {
+      scheduleAutoSync(onDone)
+    })
+  }
+  // flush a pending sync immediately when the app is backgrounded/closed
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && syncTimer !== undefined) {
+      clearTimeout(syncTimer)
+      syncTimer = undefined
+      syncNow()
+        .then(() => onDone?.())
+        .catch(() => {})
+    }
+  })
+}
+
 /** Merge an imported plain-JSON snapshot into the local database. */
 export async function importData(snap: Snapshot) {
   const merged = mergeSnapshots(await localSnapshot(), snap)
@@ -100,25 +147,30 @@ export async function syncNow(): Promise<string> {
   const token = getSetting('ghToken')
   const passphrase = getSetting('passphrase')
   if (!token || !passphrase) {
-    throw new Error('Set up sync in Settings first (GitHub token + passphrase).')
+    throw new Error('set up sync in settings first (github token + passphrase).')
   }
 
-  let snap = await localSnapshot()
-  const gistId = getSetting('gistId')
+  suppress = true
+  try {
+    let snap = await localSnapshot()
+    const gistId = getSetting('gistId')
 
-  if (gistId) {
-    const remoteRaw = await pullGist(token, gistId)
-    if (remoteRaw) {
-      const remote = await decryptJSON<Snapshot>(remoteRaw, passphrase)
-      snap = mergeSnapshots(snap, remote)
-      await writeSnapshot(snap)
+    if (gistId) {
+      const remoteRaw = await pullGist(token, gistId)
+      if (remoteRaw) {
+        const remote = await decryptJSON<Snapshot>(remoteRaw, passphrase)
+        snap = mergeSnapshots(snap, remote)
+        await writeSnapshot(snap)
+      }
+      await pushGist(token, gistId, await encryptJSON(snap, passphrase))
+    } else {
+      const id = await createGist(token, await encryptJSON(snap, passphrase))
+      setSetting('gistId', id)
     }
-    await pushGist(token, gistId, await encryptJSON(snap, passphrase))
-  } else {
-    const id = await createGist(token, await encryptJSON(snap, passphrase))
-    setSetting('gistId', id)
-  }
 
-  setSetting('lastSyncAt', String(Date.now()))
-  return 'Synced'
+    setSetting('lastSyncAt', String(Date.now()))
+    return 'synced'
+  } finally {
+    suppress = false
+  }
 }
