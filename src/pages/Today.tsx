@@ -9,6 +9,8 @@ export default function Today() {
   const today = todayStr()
   const [selected, setSelected] = useState<string[]>([])
   const [flash, setFlash] = useState(false)
+  const [jot, setJot] = useState('')
+  const [jotFlash, setJotFlash] = useState(false)
 
   const openPrep = useLiveQuery(async () =>
     (await db.prepItems.where('done').equals(0).toArray()).filter(
@@ -43,6 +45,15 @@ export default function Today() {
     setSelected([])
     setFlash(true)
     setTimeout(() => setFlash(false), 2000)
+  }
+
+  async function addJot() {
+    const t = jot.trim()
+    if (!t) return
+    await db.prepItems.add({ ...newRec(), text: t, done: 0 })
+    setJot('')
+    setJotFlash(true)
+    setTimeout(() => setJotFlash(false), 1500)
   }
 
   async function togglePractice(practiceId: string) {
@@ -84,6 +95,23 @@ export default function Today() {
         )}
       </div>
 
+      <div className="row" style={{ marginBottom: 14 }}>
+        <Link
+          to="/journal/new"
+          className="btn"
+          style={{ flex: 1, textAlign: 'center', textDecoration: 'none' }}
+        >
+          ✎ journal entry
+        </Link>
+        <Link
+          to="/sessions/new"
+          className="btn"
+          style={{ flex: 1, textAlign: 'center', textDecoration: 'none' }}
+        >
+          ≣ session note
+        </Link>
+      </div>
+
       {practices && practices.length > 0 && (
         <div className="card">
           <div className="row-between">
@@ -113,8 +141,26 @@ export default function Today() {
             all →
           </Link>
         </div>
-        {openPrep && openPrep.length > 0 ? (
-          <div style={{ marginTop: 8 }}>
+        <form
+          className="row"
+          style={{ marginTop: 10 }}
+          onSubmit={(e) => {
+            e.preventDefault()
+            void addJot()
+          }}
+        >
+          <input
+            type="text"
+            placeholder="jot something to bring up…"
+            value={jot}
+            onChange={(e) => setJot(e.target.value)}
+          />
+          <button type="submit" className="btn-primary">
+            {jotFlash ? '✓' : 'add'}
+          </button>
+        </form>
+        {openPrep && openPrep.length > 0 && (
+          <div style={{ marginTop: 4 }}>
             {openPrep.slice(0, 4).map((p) => (
               <div key={p.id} className="check-item">
                 <span className="text">{p.text}</span>
@@ -124,10 +170,6 @@ export default function Today() {
               <p className="muted small">＋{openPrep.length - 4} more</p>
             )}
           </div>
-        ) : (
-          <p className="muted small" style={{ marginBottom: 0, marginTop: 8 }}>
-            nothing queued — jot things down as they come up during the week.
-          </p>
         )}
       </div>
 
