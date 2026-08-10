@@ -25,13 +25,13 @@ function arcPath(r1: number, r2: number, startDeg: number, endDeg: number) {
   ].join(' ')
 }
 
-/** radial label placement — flipped on the left half so text is never upside down */
+/** radial label, centered in the ring; flipped on the left half so text is
+ * never upside down */
 function radialLabel(mid: number, rIn: number, rOut: number) {
   const flip = mid > 180
-  const r0 = flip ? rOut - 7 : rIn + 7
   const rot = flip ? mid + 90 : mid - 90
-  const p = polar(r0, mid)
-  return { x: p.x, y: p.y, rot, anchor: 'start' as const }
+  const p = polar((rIn + rOut) / 2, mid)
+  return { x: p.x, y: p.y, rot, anchor: 'middle' as const }
 }
 
 function FeelNode({
