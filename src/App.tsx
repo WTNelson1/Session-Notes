@@ -89,7 +89,9 @@ export default function App() {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <h1>anchor</h1>
+        <h1>
+          <Link to="/">anchor</Link>
+        </h1>
         <div className="header-actions">
           <SyncButton />
           <Link to="/settings" className="btn btn-small btn-ghost" aria-label="Settings">
