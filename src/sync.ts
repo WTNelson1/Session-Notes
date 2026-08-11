@@ -9,7 +9,12 @@ import { getSetting, setSetting, syncConfigured } from './settings'
 const FILE_NAME = 'anchor-data.enc.json'
 const API = 'https://api.github.com'
 
-type Snapshot = Record<TableName, BaseRec[]>
+interface SyncedSettings {
+  apiKey: string
+  updatedAt: number
+}
+
+type Snapshot = Record<TableName, BaseRec[]> & { _settings?: SyncedSettings }
 
 function ghHeaders(token: string): HeadersInit {
   return {
@@ -19,10 +24,16 @@ function ghHeaders(token: string): HeadersInit {
   }
 }
 
-export async function localSnapshot(): Promise<Snapshot> {
+export async function localSnapshot(includeSettings = false): Promise<Snapshot> {
   const out = {} as Snapshot
   for (const t of TABLES) {
     out[t] = (await db.table(t).toArray()) as BaseRec[]
+  }
+  if (includeSettings) {
+    out._settings = {
+      apiKey: getSetting('apiKey'),
+      updatedAt: Number(getSetting('apiKeyUpdatedAt') || 0),
+    }
   }
   return out
 }
@@ -38,7 +49,19 @@ export function mergeSnapshots(a: Snapshot, b: Snapshot): Snapshot {
     }
     out[t] = [...byId.values()]
   }
+  const sa = a._settings
+  const sb = b._settings
+  out._settings = !sb ? sa : !sa ? sb : sb.updatedAt > sa.updatedAt ? sb : sa
   return out
+}
+
+function applySyncedSettings(s?: SyncedSettings) {
+  if (!s) return
+  const localStamp = Number(getSetting('apiKeyUpdatedAt') || 0)
+  if (s.updatedAt > localStamp) {
+    setSetting('apiKey', s.apiKey)
+    setSetting('apiKeyUpdatedAt', String(s.updatedAt))
+  }
 }
 
 async function writeSnapshot(snap: Snapshot) {
@@ -152,7 +175,7 @@ export async function syncNow(): Promise<string> {
 
   suppress = true
   try {
-    let snap = await localSnapshot()
+    let snap = await localSnapshot(true)
     const gistId = getSetting('gistId')
 
     if (gistId) {
@@ -161,6 +184,7 @@ export async function syncNow(): Promise<string> {
         const remote = await decryptJSON<Snapshot>(remoteRaw, passphrase)
         snap = mergeSnapshots(snap, remote)
         await writeSnapshot(snap)
+        applySyncedSettings(snap._settings)
       }
       await pushGist(token, gistId, await encryptJSON(snap, passphrase))
     } else {

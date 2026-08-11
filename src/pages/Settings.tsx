@@ -105,8 +105,9 @@ export default function Settings() {
           password
         />
         <p className="muted small" style={{ marginBottom: 0 }}>
-          Create a key at <code>console.anthropic.com</code> → API keys. The key is stored only on
-          this device. Notes are sent to the Claude API only when you run an analysis.
+          create a key at <code>console.anthropic.com</code> → api keys. once sync is set up, the
+          key travels to your other devices inside the same encrypted blob as your notes — enter it
+          once. notes are sent to the claude api only when you run an analysis.
         </p>
       </div>
 
