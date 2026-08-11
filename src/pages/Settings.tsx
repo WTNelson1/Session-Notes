@@ -15,20 +15,33 @@ function SettingInput({
   password?: boolean
 }) {
   const [value, setValue] = useState(getSetting(settingKey))
+  const [show, setShow] = useState(false)
   return (
     <label className="field">
       <span className="label-text">{label}</span>
-      <input
-        type={password ? 'password' : 'text'}
-        placeholder={placeholder}
-        value={value}
-        autoCapitalize="off"
-        autoCorrect="off"
-        onChange={(e) => {
-          setValue(e.target.value)
-          setSetting(settingKey, e.target.value.trim())
-        }}
-      />
+      <div className="row">
+        <input
+          type={password && !show ? 'password' : 'text'}
+          placeholder={placeholder}
+          value={value}
+          autoCapitalize="off"
+          autoCorrect="off"
+          spellCheck={false}
+          onChange={(e) => {
+            setValue(e.target.value)
+            setSetting(settingKey, e.target.value.trim())
+          }}
+        />
+        {password && (
+          <button
+            type="button"
+            className="btn-small btn-ghost"
+            onClick={() => setShow(!show)}
+          >
+            {show ? 'hide' : 'show'}
+          </button>
+        )}
+      </div>
     </label>
   )
 }
