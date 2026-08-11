@@ -24,6 +24,7 @@ export default function SessionDetail() {
   const [savedFlash, setSavedFlash] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [summarizing, setSummarizing] = useState(false)
+  const [summary, setSummary] = useState('')
 
   useEffect(() => {
     if (isNew || !id) return
@@ -32,6 +33,7 @@ export default function SessionDetail() {
         setDate(s.date)
         setOutline(parseOutline(s.notes))
         setTakeaways(s.takeaways)
+        setSummary(s.summary ?? '')
       }
       setLoaded(true)
     })
@@ -81,8 +83,11 @@ export default function SessionDetail() {
     if (existing?.summaryHash === hash && existing.summary) return
     setSummarizing(true)
     try {
-      const summary = await summarizeSession(apiKey, notes, takeaways)
-      if (summary) await patch(db.sessions, sid, { summary, summaryHash: hash })
+      const fresh = await summarizeSession(apiKey, notes, takeaways)
+      if (fresh) {
+        await patch(db.sessions, sid, { summary: fresh, summaryHash: hash })
+        setSummary(fresh)
+      }
     } catch {
       // offline / declined — the list falls back to the raw note preview
     } finally {
@@ -118,6 +123,7 @@ export default function SessionDetail() {
   return (
     <div>
       <div className="card">
+        {summary && <p className="session-summary">✦ {summary}</p>}
         <label className="field">
           <span className="label-text">Session date</span>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />

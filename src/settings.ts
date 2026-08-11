@@ -2,7 +2,8 @@ const PREFIX = 'anchor.'
 
 export type SettingKey =
   | 'apiKey'
-  | 'apiKeyUpdatedAt'
+  | 'aboutMe'
+  | 'apiKeyUpdatedAt' // shared LWW stamp for all synced settings (apiKey + aboutMe)
   | 'ghToken'
   | 'gistId'
   | 'passphrase'
@@ -15,8 +16,8 @@ export function getSetting(key: SettingKey): string {
 export function setSetting(key: SettingKey, value: string) {
   if (value) localStorage.setItem(PREFIX + key, value)
   else localStorage.removeItem(PREFIX + key)
-  // the api key rides along in encrypted sync — stamp edits for LWW merging
-  if (key === 'apiKey') {
+  // api key + about-me ride along in encrypted sync — stamp edits for LWW merging
+  if (key === 'apiKey' || key === 'aboutMe') {
     localStorage.setItem(PREFIX + 'apiKeyUpdatedAt', String(Date.now()))
   }
 }

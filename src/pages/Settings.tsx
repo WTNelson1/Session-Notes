@@ -8,40 +8,54 @@ function SettingInput({
   label,
   placeholder,
   password = false,
+  multiline = false,
 }: {
   settingKey: SettingKey
   label: string
   placeholder?: string
   password?: boolean
+  multiline?: boolean
 }) {
   const [value, setValue] = useState(getSetting(settingKey))
   const [show, setShow] = useState(false)
+
+  function commit(v: string) {
+    setValue(v)
+    setSetting(settingKey, v.trim())
+  }
+
   return (
     <label className="field">
       <span className="label-text">{label}</span>
-      <div className="row">
-        <input
-          type={password && !show ? 'password' : 'text'}
+      {multiline ? (
+        <textarea
           placeholder={placeholder}
           value={value}
-          autoCapitalize="off"
-          autoCorrect="off"
-          spellCheck={false}
-          onChange={(e) => {
-            setValue(e.target.value)
-            setSetting(settingKey, e.target.value.trim())
-          }}
+          rows={4}
+          onChange={(e) => commit(e.target.value)}
         />
-        {password && (
-          <button
-            type="button"
-            className="btn-small btn-ghost"
-            onClick={() => setShow(!show)}
-          >
-            {show ? 'hide' : 'show'}
-          </button>
-        )}
-      </div>
+      ) : (
+        <div className="row">
+          <input
+            type={password && !show ? 'password' : 'text'}
+            placeholder={placeholder}
+            value={value}
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
+            onChange={(e) => commit(e.target.value)}
+          />
+          {password && (
+            <button
+              type="button"
+              className="btn-small btn-ghost"
+              onClick={() => setShow(!show)}
+            >
+              {show ? 'hide' : 'show'}
+            </button>
+          )}
+        </div>
+      )}
     </label>
   )
 }
@@ -103,6 +117,12 @@ export default function Settings() {
           label="Anthropic API key"
           placeholder="sk-ant-…"
           password
+        />
+        <SettingInput
+          settingKey="aboutMe"
+          label="about you (shared with the ai)"
+          placeholder="e.g. I'm a man (he/him). My therapist is Dr. K. People who come up often: …"
+          multiline
         />
         <p className="muted small" style={{ marginBottom: 0 }}>
           create a key at <code>console.anthropic.com</code> → api keys. once sync is set up, the

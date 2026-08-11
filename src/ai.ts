@@ -1,5 +1,12 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { db, alive, todayStr } from './db'
+import { getSetting } from './settings'
+
+/** optional user-provided context (pronouns, names, anything) for every AI call */
+function aboutBlock(): string {
+  const about = getSetting('aboutMe').trim()
+  return about ? `\n\nAbout the author, in their own words: ${about}` : ''
+}
 
 const SYSTEM = `You are a thoughtful companion inside a private therapy-notes app. The user will share their own journal: therapy session notes, session-prep topics, feelings check-ins from an emotion wheel (they are practicing naming feelings precisely — acknowledge and reinforce that skill), journal entries, and between-session practices.
 
@@ -9,6 +16,8 @@ Your job is to help them see their own material more clearly:
 - Suggest concrete, gentle next steps: topics worth raising in the next session, practices worth trying or revisiting.
 
 Ground everything in what the notes actually say; quote or paraphrase briefly rather than inventing. Be warm and direct, not clinical or saccharine. You are not a therapist and must not diagnose; when something reads as serious (self-harm, crisis), say plainly that it belongs in the room with their therapist or a crisis line rather than in this app.
+
+Address the author directly as "you" — never refer to them in the third person, and never guess at their pronouns or gender.
 
 Format with short markdown headings and tight paragraphs. Lead with the most useful observation.`
 
@@ -154,7 +163,8 @@ export async function summarizeSession(
     betas: ['server-side-fallback-2026-06-01'],
     fallbacks: [{ model: 'claude-opus-4-8' }],
     system:
-      'You write one-line previews of therapy session notes, so the author can recognize a session at a glance in a list. Capture the main focus and the single biggest point or shift. 1-2 sentences, at most ~35 words, plain prose, lowercase, no preamble, no quotes around the output.',
+      'You write one-line previews of therapy session notes, so the author can recognize a session at a glance in a list. Capture the main focus and the single biggest point or shift. 1-2 sentences, at most ~35 words, plain prose, lowercase, no preamble, no quotes around the output. Refer to the author as "you" (e.g. "explored your pattern of…") — never in the third person, and never guess at pronouns or gender.' +
+      aboutBlock(),
     messages: [
       {
         role: 'user',
@@ -192,7 +202,7 @@ export async function runInsight(
     // the server-side fallback re-runs those on Opus 4.8 in the same call.
     betas: ['server-side-fallback-2026-06-01'],
     fallbacks: [{ model: 'claude-opus-4-8' }],
-    system: SYSTEM,
+    system: SYSTEM + aboutBlock(),
     messages: [
       {
         role: 'user',

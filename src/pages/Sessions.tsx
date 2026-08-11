@@ -66,7 +66,7 @@ export default function Sessions() {
               day: 'numeric',
             })}
           </strong>
-          <p className="preview" style={{ margin: '6px 0 0' }}>
+          <p className={`preview ${s.summary ? 'full' : ''}`} style={{ margin: '6px 0 0' }}>
             {s.summary ? `✦ ${s.summary}` : s.notes.replace(/^\s*-\s?/gm, '') || 'no notes'}
           </p>
         </Link>

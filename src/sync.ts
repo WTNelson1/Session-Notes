@@ -11,6 +11,7 @@ const API = 'https://api.github.com'
 
 interface SyncedSettings {
   apiKey: string
+  aboutMe?: string
   updatedAt: number
 }
 
@@ -32,6 +33,7 @@ export async function localSnapshot(includeSettings = false): Promise<Snapshot> 
   if (includeSettings) {
     out._settings = {
       apiKey: getSetting('apiKey'),
+      aboutMe: getSetting('aboutMe'),
       updatedAt: Number(getSetting('apiKeyUpdatedAt') || 0),
     }
   }
@@ -60,6 +62,7 @@ function applySyncedSettings(s?: SyncedSettings) {
   const localStamp = Number(getSetting('apiKeyUpdatedAt') || 0)
   if (s.updatedAt > localStamp) {
     setSetting('apiKey', s.apiKey)
+    setSetting('aboutMe', s.aboutMe ?? '')
     setSetting('apiKeyUpdatedAt', String(s.updatedAt))
   }
 }
