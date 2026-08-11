@@ -107,7 +107,8 @@ export default function Settings() {
         <p className="muted small" style={{ marginBottom: 0 }}>
           create a key at <code>console.anthropic.com</code> → api keys. once sync is set up, the
           key travels to your other devices inside the same encrypted blob as your notes — enter it
-          once. notes are sent to the claude api only when you run an analysis.
+          once. notes are sent to the claude api when you run an analysis or save a session note
+          (for its ✦ preview summary) — never in the background.
         </p>
       </div>
 

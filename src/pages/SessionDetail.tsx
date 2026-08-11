@@ -7,6 +7,8 @@ import OutlineEditor, {
   serializeOutline,
   type OutlineLine,
 } from '../components/OutlineEditor'
+import { summarizeSession, textHash } from '../ai'
+import { getSetting } from '../settings'
 
 export default function SessionDetail() {
   const { id } = useParams()
@@ -21,6 +23,7 @@ export default function SessionDetail() {
   const [loaded, setLoaded] = useState(isNew)
   const [savedFlash, setSavedFlash] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [summarizing, setSummarizing] = useState(false)
 
   useEffect(() => {
     if (isNew || !id) return
@@ -62,9 +65,29 @@ export default function SessionDetail() {
   }
 
   async function saveAndFlash() {
-    await save()
+    const sid = await save()
     setSavedFlash(true)
     setTimeout(() => setSavedFlash(false), 1500)
+    void maybeSummarize(sid)
+  }
+
+  /** background: distill the note into the ✦ list preview (skips if unchanged) */
+  async function maybeSummarize(sid: string) {
+    const apiKey = getSetting('apiKey')
+    const notes = serializeOutline(outline)
+    if (!apiKey || !notes.trim()) return
+    const hash = textHash(notes + '|' + takeaways)
+    const existing = await db.sessions.get(sid)
+    if (existing?.summaryHash === hash && existing.summary) return
+    setSummarizing(true)
+    try {
+      const summary = await summarizeSession(apiKey, notes, takeaways)
+      if (summary) await patch(db.sessions, sid, { summary, summaryHash: hash })
+    } catch {
+      // offline / declined — the list falls back to the raw note preview
+    } finally {
+      setSummarizing(false)
+    }
   }
 
   async function markCovered(item: PrepItem, cascade: boolean) {
@@ -119,9 +142,16 @@ export default function SessionDetail() {
           />
         </label>
         <div className="row-between">
-          <button className="btn-primary" onClick={saveAndFlash}>
-            {savedFlash ? 'saved ✓' : 'save'}
-          </button>
+          <span className="row">
+            <button className="btn-primary" onClick={saveAndFlash}>
+              {savedFlash ? 'saved ✓' : 'save'}
+            </button>
+            {summarizing && (
+              <span className="muted small" style={{ color: 'var(--accent)' }}>
+                ✦ summarizing…
+              </span>
+            )}
+          </span>
           {sessionId &&
             (confirmingDelete ? (
               <span className="row">

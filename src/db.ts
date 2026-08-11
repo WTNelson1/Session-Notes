@@ -20,6 +20,10 @@ export interface Session extends BaseRec {
   date: string // YYYY-MM-DD
   notes: string
   takeaways: string
+  /** ✦ 1-2 sentence AI summary shown as the list preview */
+  summary?: string
+  /** hash of the text the summary was generated from, to skip regeneration */
+  summaryHash?: string
 }
 
 export interface Practice extends BaseRec {

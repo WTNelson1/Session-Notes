@@ -26,7 +26,7 @@ export default function Sessions() {
             })}
           </strong>
           <p className="preview" style={{ margin: '6px 0 0' }}>
-            {s.notes.replace(/^\s*-\s?/gm, '') || 'no notes'}
+            {s.summary ? `✦ ${s.summary}` : s.notes.replace(/^\s*-\s?/gm, '') || 'no notes'}
           </p>
         </Link>
       ))}

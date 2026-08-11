@@ -134,6 +134,42 @@ export async function buildContext(sinceDays: number | null): Promise<string> {
   return parts.join('\n\n')
 }
 
+/** cheap stable hash so we only re-summarize when the note text changed */
+export function textHash(s: string): string {
+  let h = 5381
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0
+  return String(h)
+}
+
+/** Distill a session note into a 1-2 sentence scannable preview. */
+export async function summarizeSession(
+  apiKey: string,
+  notes: string,
+  takeaways: string,
+): Promise<string> {
+  const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true })
+  const resp = await client.beta.messages.create({
+    model: 'claude-opus-5',
+    max_tokens: 300,
+    betas: ['server-side-fallback-2026-06-01'],
+    fallbacks: [{ model: 'claude-opus-4-8' }],
+    system:
+      'You write one-line previews of therapy session notes, so the author can recognize a session at a glance in a list. Capture the main focus and the single biggest point or shift. 1-2 sentences, at most ~35 words, plain prose, lowercase, no preamble, no quotes around the output.',
+    messages: [
+      {
+        role: 'user',
+        content: `Summarize this session note:\n\n<note>\n${notes}${takeaways.trim() ? `\n\nTakeaways: ${takeaways}` : ''}\n</note>`,
+      },
+    ],
+  })
+  if (resp.stop_reason === 'refusal') throw new Error('summary declined')
+  return resp.content
+    .filter((b) => b.type === 'text')
+    .map((b) => b.text)
+    .join('')
+    .trim()
+}
+
 /**
  * Stream an insight from Claude. Calls onDelta with each text chunk;
  * resolves with the full text.

@@ -179,7 +179,9 @@ export default function Today() {
           <Link to={`/sessions/${lastSession.id}`} className="session-item">
             <strong>{lastSession.date}</strong>
             <p className="preview" style={{ margin: '4px 0 0' }}>
-              {lastSession.notes.replace(/^\s*-\s?/gm, '') || 'no notes'}
+              {lastSession.summary
+                ? `✦ ${lastSession.summary}`
+                : lastSession.notes.replace(/^\s*-\s?/gm, '') || 'no notes'}
             </p>
           </Link>
         </div>
