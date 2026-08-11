@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
-import { db, TABLES } from '../db'
+import { db, TABLES, alive, patch } from '../db'
 import { getSetting, setSetting, type SettingKey } from '../settings'
 import { localSnapshot, importData, syncNow } from '../sync'
+import { summarizeSession, textHash } from '../ai'
 
 function SettingInput({
   settingKey,
@@ -63,7 +64,33 @@ function SettingInput({
 export default function Settings() {
   const [syncMsg, setSyncMsg] = useState('')
   const [copied, setCopied] = useState(false)
+  const [regenProgress, setRegenProgress] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  /** one-time maintenance: re-run every ✦ summary under the current about-you text */
+  async function regenerateSummaries() {
+    const apiKey = getSetting('apiKey')
+    if (!apiKey || regenProgress) return
+    const targets = (await db.sessions.toArray()).filter((s) => alive(s) && s.notes.trim())
+    let done = 0
+    for (const s of targets) {
+      setRegenProgress(`✦ ${done + 1}/${targets.length}…`)
+      try {
+        const summary = await summarizeSession(apiKey, s.notes, s.takeaways)
+        if (summary) {
+          await patch(db.sessions, s.id, {
+            summary,
+            summaryHash: textHash(s.notes + '|' + s.takeaways),
+          })
+        }
+      } catch {
+        // skip failures; those notes keep their current summary
+      }
+      done++
+    }
+    setRegenProgress('done ✓')
+    setTimeout(() => setRegenProgress(null), 2500)
+  }
 
   const lastSync = getSetting('lastSyncAt')
   const checkinUrl = `${location.origin}${location.pathname}#/checkin`
@@ -124,12 +151,15 @@ export default function Settings() {
           placeholder="e.g. I'm a man (he/him). My therapist is Dr. K. People who come up often: …"
           multiline
         />
-        <p className="muted small" style={{ marginBottom: 0 }}>
+        <p className="muted small">
           create a key at <code>console.anthropic.com</code> → api keys. once sync is set up, the
-          key travels to your other devices inside the same encrypted blob as your notes — enter it
-          once. notes are sent to the claude api when you run an analysis or save a session note
-          (for its ✦ preview summary) — never in the background.
+          key and the about-you text travel to your other devices inside the same encrypted blob as
+          your notes — enter them once. notes are sent to the claude api when you run an analysis or
+          open/save a session note (for its ✦ summary and review) — never otherwise.
         </p>
+        <button className="btn-small btn-ghost" disabled={!!regenProgress} onClick={regenerateSummaries}>
+          {regenProgress ?? '↻ regenerate all summaries (after editing the text above)'}
+        </button>
       </div>
 
       <div className="card">

@@ -47,21 +47,15 @@ export default function Sessions() {
         ＋ new session note
       </Link>
 
-      {apiKey && summarizable.length > 0 && (
-        <div className="row" style={{ justifyContent: 'center', marginBottom: 14 }}>
-          {unsummarized.length > 0 && (
-            <button className="btn-small" disabled={!!progress} onClick={() => backfill(false)}>
-              {progress ?? `✦ summarize ${unsummarized.length} older ${unsummarized.length === 1 ? 'note' : 'notes'}`}
-            </button>
-          )}
-          <button
-            className="btn-small btn-ghost"
-            disabled={!!progress}
-            onClick={() => backfill(true)}
-          >
-            {progress && unsummarized.length === 0 ? progress : '↻ regenerate all summaries'}
-          </button>
-        </div>
+      {apiKey && unsummarized.length > 0 && (
+        <button
+          className="btn-small"
+          style={{ display: 'block', margin: '0 auto 14px' }}
+          disabled={!!progress}
+          onClick={() => backfill(false)}
+        >
+          {progress ?? `✦ summarize ${unsummarized.length} older ${unsummarized.length === 1 ? 'note' : 'notes'}`}
+        </button>
       )}
 
       {sessions?.map((s) => (

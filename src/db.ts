@@ -24,6 +24,9 @@ export interface Session extends BaseRec {
   summary?: string
   /** hash of the text the summary was generated from, to skip regeneration */
   summaryHash?: string
+  /** ✦ structured five-section review, generated for substantial notes */
+  review?: string
+  reviewHash?: string
 }
 
 export interface Practice extends BaseRec {

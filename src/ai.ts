@@ -180,6 +180,67 @@ export async function summarizeSession(
     .trim()
 }
 
+/** notes shorter than this get no auto-review — thin material invites invention */
+export const REVIEW_MIN_CHARS = 280
+
+const REVIEW_SYSTEM = `You review a single therapy session note for its author. Produce exactly these markdown sections:
+
+## core themes
+2-3 themes, one line each.
+
+## key moments
+Insights or reframes, kept in the author's own language — quote or closely paraphrase the note.
+
+## action items
+Anything the author committed to or their therapist assigned. Only what the note actually records.
+
+## continuity
+Recurring patterns, progress on earlier threads, and contradictions — when the note contradicts what the author has said they want, point it out plainly. You may reference ONLY the earlier sessions provided in <earlier_sessions>; if none are provided or none are relevant, write "nothing to connect yet."
+
+## open questions
+Unresolved topics worth revisiting.
+
+Grounding rules — these override everything else:
+- Work only from what is written. Never invent moments, quotes, commitments, or details that are not in the notes.
+- Scale to the material: a thin note gets a thin review — one line per section, or "nothing in the notes for this."
+- Use the author's framing and their therapist's — no clinical labels neither of them used. Don't diagnose or prescribe.
+- Lowercase, direct, no preamble, no closing remarks.`
+
+/** Generate the five-section review for one session, grounded in its note
+ * plus up to three earlier sessions (for continuity only). */
+export async function reviewSession(
+  apiKey: string,
+  session: { date: string; notes: string; takeaways: string },
+  history: { date: string; notes: string; takeaways: string }[],
+): Promise<string> {
+  const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true })
+  const earlier = history
+    .map(
+      (h) =>
+        `<session date="${h.date}">\n${h.notes}${h.takeaways.trim() ? `\nTakeaways: ${h.takeaways}` : ''}\n</session>`,
+    )
+    .join('\n')
+  const resp = await client.beta.messages.create({
+    model: 'claude-opus-5',
+    max_tokens: 1500,
+    betas: ['server-side-fallback-2026-06-01'],
+    fallbacks: [{ model: 'claude-opus-4-8' }],
+    system: REVIEW_SYSTEM + aboutBlock(),
+    messages: [
+      {
+        role: 'user',
+        content: `Review this session:\n\n<session date="${session.date}">\n${session.notes}${session.takeaways.trim() ? `\n\nTakeaways: ${session.takeaways}` : ''}\n</session>\n\n<earlier_sessions>\n${earlier || '(none)'}\n</earlier_sessions>`,
+      },
+    ],
+  })
+  if (resp.stop_reason === 'refusal') throw new Error('review declined')
+  return resp.content
+    .filter((b) => b.type === 'text')
+    .map((b) => b.text)
+    .join('')
+    .trim()
+}
+
 /**
  * Stream an insight from Claude. Calls onDelta with each text chunk;
  * resolves with the full text.

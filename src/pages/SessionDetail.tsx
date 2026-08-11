@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, alive, newRec, patch, softDelete, todayStr, type PrepItem } from '../db'
@@ -7,7 +7,7 @@ import OutlineEditor, {
   serializeOutline,
   type OutlineLine,
 } from '../components/OutlineEditor'
-import { summarizeSession, textHash } from '../ai'
+import { summarizeSession, reviewSession, textHash, REVIEW_MIN_CHARS } from '../ai'
 import { getSetting } from '../settings'
 
 export default function SessionDetail() {
@@ -25,6 +25,9 @@ export default function SessionDetail() {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [summarizing, setSummarizing] = useState(false)
   const [summary, setSummary] = useState('')
+  const [review, setReview] = useState('')
+  const [reviewing, setReviewing] = useState(false)
+  const reviewInFlight = useRef(false)
 
   useEffect(() => {
     if (isNew || !id) return
@@ -34,9 +37,13 @@ export default function SessionDetail() {
         setOutline(parseOutline(s.notes))
         setTakeaways(s.takeaways)
         setSummary(s.summary ?? '')
+        setReview(s.review ?? '')
+        // reviews auto-run for substantial notes and cache by content hash
+        void maybeReview(s.id)
       }
       setLoaded(true)
     })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, isNew])
 
   const prepItems = useLiveQuery(async () => (await db.prepItems.toArray()).filter(alive))
@@ -71,6 +78,36 @@ export default function SessionDetail() {
     setSavedFlash(true)
     setTimeout(() => setSavedFlash(false), 1500)
     void maybeSummarize(sid)
+    void maybeReview(sid)
+  }
+
+  /** background: five-section review, only for substantial notes, cached by hash */
+  async function maybeReview(sid: string) {
+    const apiKey = getSetting('apiKey')
+    if (!apiKey || reviewInFlight.current) return
+    const s = await db.sessions.get(sid)
+    if (!s || s.notes.trim().length < REVIEW_MIN_CHARS) return
+    const hash = textHash('r|' + s.notes + '|' + s.takeaways)
+    if (s.reviewHash === hash && s.review) return
+    reviewInFlight.current = true
+    setReviewing(true)
+    try {
+      const history = (await db.sessions.toArray())
+        .filter(alive)
+        .filter((h) => h.id !== sid && h.notes.trim() && h.date <= s.date)
+        .sort((a, b) => b.date.localeCompare(a.date))
+        .slice(0, 3)
+      const result = await reviewSession(apiKey, s, history)
+      if (result) {
+        await patch(db.sessions, sid, { review: result, reviewHash: hash })
+        setReview(result)
+      }
+    } catch {
+      // offline / declined — the page simply shows no review yet
+    } finally {
+      reviewInFlight.current = false
+      setReviewing(false)
+    }
   }
 
   /** background: distill the note into the ✦ list preview (skips if unchanged) */
@@ -178,6 +215,24 @@ export default function SessionDetail() {
             ))}
         </div>
       </div>
+
+      {(review || reviewing) && (
+        <div className="card">
+          <div className="row-between">
+            <h2 style={{ marginBottom: 0 }}>✦ session review</h2>
+            {reviewing && (
+              <span className="muted small" style={{ color: 'var(--accent)' }}>
+                ✦ updating…
+              </span>
+            )}
+          </div>
+          {review && (
+            <div className="insight-output" style={{ marginTop: 10 }}>
+              {review}
+            </div>
+          )}
+        </div>
+      )}
 
       {openTops.length > 0 && (
         <div className="card">
