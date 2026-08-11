@@ -15,14 +15,16 @@ export default function Sessions() {
   )
 
   const apiKey = getSetting('apiKey')
-  const unsummarized =
-    sessions?.filter((s) => s.notes.trim() && !s.summary) ?? []
+  const summarizable = sessions?.filter((s) => s.notes.trim()) ?? []
+  const unsummarized = summarizable.filter((s) => !s.summary)
 
-  async function backfill() {
+  /** force=true re-runs every note (e.g. after changing the about-you context) */
+  async function backfill(force: boolean) {
     if (!apiKey || progress) return
+    const targets = force ? summarizable : unsummarized
     let done = 0
-    for (const s of unsummarized) {
-      setProgress(`✦ ${done + 1}/${unsummarized.length}…`)
+    for (const s of targets) {
+      setProgress(`✦ ${done + 1}/${targets.length}…`)
       try {
         const summary = await summarizeSession(apiKey, s.notes, s.takeaways)
         if (summary) {
@@ -32,7 +34,7 @@ export default function Sessions() {
           })
         }
       } catch {
-        // offline / declined — skip this one, it stays on the raw preview
+        // offline / declined — skip this one, it keeps its current preview
       }
       done++
     }
@@ -45,15 +47,21 @@ export default function Sessions() {
         ＋ new session note
       </Link>
 
-      {apiKey && unsummarized.length > 0 && (
-        <button
-          className="btn-small"
-          style={{ display: 'block', margin: '0 auto 14px' }}
-          disabled={!!progress}
-          onClick={backfill}
-        >
-          {progress ?? `✦ summarize ${unsummarized.length} older ${unsummarized.length === 1 ? 'note' : 'notes'}`}
-        </button>
+      {apiKey && summarizable.length > 0 && (
+        <div className="row" style={{ justifyContent: 'center', marginBottom: 14 }}>
+          {unsummarized.length > 0 && (
+            <button className="btn-small" disabled={!!progress} onClick={() => backfill(false)}>
+              {progress ?? `✦ summarize ${unsummarized.length} older ${unsummarized.length === 1 ? 'note' : 'notes'}`}
+            </button>
+          )}
+          <button
+            className="btn-small btn-ghost"
+            disabled={!!progress}
+            onClick={() => backfill(true)}
+          >
+            {progress && unsummarized.length === 0 ? progress : '↻ regenerate all summaries'}
+          </button>
+        </div>
       )}
 
       {sessions?.map((s) => (
