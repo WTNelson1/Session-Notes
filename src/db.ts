@@ -14,6 +14,8 @@ export interface PrepItem extends BaseRec {
   doneAt?: number
   /** set on sub-items: the id of the parent topic */
   parentId?: string
+  /** optional user-named group for top-level topics (e.g. "work", "vic") */
+  bucket?: string
 }
 
 export interface Session extends BaseRec {

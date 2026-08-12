@@ -298,6 +298,23 @@ label.field .label-text, .field .label-text {
 .sub-input { margin: 4px 0 10px 25px; }
 .sub-input input { padding: 6px 10px; font-size: 13px; }
 
+.bucket-header {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--text-mute);
+  margin: 14px 0 2px;
+}
+.bucket-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin: 2px 0 10px 25px;
+}
+.bucket-picker input { padding: 6px 10px; font-size: 13px; width: 130px; }
+
 /* ---------- outline editor ---------- */
 .outline-editor {
   background: var(--bg-elev-2);

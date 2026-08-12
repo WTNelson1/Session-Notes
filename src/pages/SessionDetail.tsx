@@ -237,28 +237,46 @@ export default function SessionDetail() {
       {openTops.length > 0 && (
         <div className="card">
           <h2>Prep topics — check off what you covered</h2>
-          {openTops.map((p) => (
-            <div key={p.id} className="topic-group">
-              <label className="check-item">
-                <input type="checkbox" checked={false} onChange={() => markCovered(p, true)} />
-                <span className="text">{p.text}</span>
-              </label>
-              {childrenOf(p.id).map((c) => (
-                <label key={c.id} className={`check-item sub-item ${c.done ? 'done' : ''}`}>
-                  <input
-                    type="checkbox"
-                    checked={!!c.done}
-                    onChange={() =>
-                      c.done
-                        ? patch(db.prepItems, c.id, { done: 0, doneAt: undefined })
-                        : markCovered(c, false)
-                    }
-                  />
-                  <span className="text">{c.text}</span>
-                </label>
-              ))}
-            </div>
-          ))}
+          {[undefined, ...[...new Set(openTops.map((p) => p.bucket).filter(Boolean))].sort()].map(
+            (bucket) => {
+              const group = openTops.filter((p) => p.bucket === bucket)
+              if (group.length === 0) return null
+              return (
+                <div key={bucket ?? '·inbox'}>
+                  {bucket && <p className="bucket-header">⌗ {bucket}</p>}
+                  {group.map((p) => (
+                    <div key={p.id} className="topic-group">
+                      <label className="check-item">
+                        <input
+                          type="checkbox"
+                          checked={false}
+                          onChange={() => markCovered(p, true)}
+                        />
+                        <span className="text">{p.text}</span>
+                      </label>
+                      {childrenOf(p.id).map((c) => (
+                        <label
+                          key={c.id}
+                          className={`check-item sub-item ${c.done ? 'done' : ''}`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={!!c.done}
+                            onChange={() =>
+                              c.done
+                                ? patch(db.prepItems, c.id, { done: 0, doneAt: undefined })
+                                : markCovered(c, false)
+                            }
+                          />
+                          <span className="text">{c.text}</span>
+                        </label>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )
+            },
+          )}
         </div>
       )}
 
