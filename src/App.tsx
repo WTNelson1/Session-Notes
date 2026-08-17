@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { NavLink, Route, Routes, useLocation, Link } from 'react-router-dom'
+import AppSwitcher from '@personal-os/kit/AppSwitcher'
+import TopNav from './components/TopNav'
 import Today from './pages/Today'
 import Prep from './pages/Prep'
 import Sessions from './pages/Sessions'
@@ -66,6 +68,12 @@ function SyncButton() {
   )
 }
 
+// The suite. Each app's dot is its own accent — the palette is the wayfinding.
+const APPS = [
+  { name: 'helm', url: 'https://helm-blush.vercel.app', color: '#7ad6c0' },
+  { name: 'anchor', url: 'https://wtnelson1.github.io/Session-Notes/', color: '#e8b64c' },
+]
+
 const NAV = [
   { to: '/', end: true, glyph: '◉', label: 'today' },
   { to: '/journal', end: false, glyph: '✎', label: 'journal' },
@@ -90,7 +98,7 @@ export default function App() {
     <div className="app-shell">
       <header className="app-header">
         <h1>
-          <Link to="/">anchor</Link>
+          <AppSwitcher apps={APPS} current="anchor" />
         </h1>
         <div className="header-actions">
           <SyncButton />
