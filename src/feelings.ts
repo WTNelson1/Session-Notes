@@ -99,6 +99,46 @@ export const WHEEL: CoreFamily[] = [
   },
 ]
 
+/** flat search index — built once at module load, in memory */
+export interface WordEntry {
+  word: string
+  family: string
+  color: string
+  /** middle-ring parent for outer words, so results show a hint of location */
+  via?: string
+}
+export const ALL_WORDS: WordEntry[] = (() => {
+  const seen = new Set<string>()
+  const out: WordEntry[] = []
+  for (const core of WHEEL) {
+    const push = (word: string, via?: string) => {
+      if (seen.has(word)) return
+      seen.add(word)
+      out.push({ word, family: core.name, color: core.color, via })
+    }
+    push(core.name)
+    for (const mid of core.children) {
+      push(mid.name, core.name)
+      for (const w of mid.children) push(w, mid.name)
+    }
+  }
+  return out
+})()
+
+/** prefix-first, then substring; case-insensitive; synchronous and instant */
+export function searchFeelings(q: string, limit = 12): WordEntry[] {
+  const s = q.trim().toLowerCase()
+  if (!s) return []
+  const starts: WordEntry[] = []
+  const contains: WordEntry[] = []
+  for (const e of ALL_WORDS) {
+    if (e.word.startsWith(s)) starts.push(e)
+    else if (e.word.includes(s)) contains.push(e)
+    if (starts.length >= limit) break
+  }
+  return [...starts, ...contains].slice(0, limit)
+}
+
 /** word → family color (first family wins for the few duplicated words) */
 export const WORD_COLOR = new Map<string, string>()
 for (const core of WHEEL) {

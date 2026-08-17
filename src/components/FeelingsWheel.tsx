@@ -1,5 +1,5 @@
-import { useState, type CSSProperties } from 'react'
-import { WHEEL, type CoreFamily } from '../feelings'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { WHEEL, searchFeelings, type CoreFamily } from '../feelings'
 
 const CX = 180
 const CY = 180
@@ -99,6 +99,93 @@ function Connector({ n, color }: { n: number; color: string }) {
   )
 }
 
+/** instant type-ahead over the in-memory vocabulary — no async, no network */
+function FeelingSearch({
+  selected,
+  onToggle,
+  onClose,
+}: {
+  selected: string[]
+  onToggle: (word: string) => void
+  onClose: () => void
+}) {
+  const [q, setQ] = useState('')
+  const [cursor, setCursor] = useState(0)
+  const ref = useRef<HTMLInputElement>(null)
+  const results = searchFeelings(q)
+
+  useEffect(() => {
+    ref.current?.focus()
+  }, [])
+  useEffect(() => {
+    setCursor(0)
+  }, [q])
+
+  function pick(word: string) {
+    onToggle(word)
+    setQ('')
+    ref.current?.focus()
+  }
+
+  return (
+    <div className="feel-search">
+      <div className="row">
+        <input
+          ref={ref}
+          type="text"
+          placeholder="type a feeling…"
+          value={q}
+          autoCapitalize="off"
+          autoCorrect="off"
+          spellCheck={false}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowDown') {
+              e.preventDefault()
+              setCursor((c) => Math.min(c + 1, results.length - 1))
+            } else if (e.key === 'ArrowUp') {
+              e.preventDefault()
+              setCursor((c) => Math.max(c - 1, 0))
+            } else if (e.key === 'Enter' && results[cursor]) {
+              e.preventDefault()
+              pick(results[cursor].word)
+            } else if (e.key === 'Escape') {
+              onClose()
+            }
+          }}
+        />
+        <button className="btn-small btn-ghost" onClick={onClose} aria-label="close search">
+          ×
+        </button>
+      </div>
+      {results.length > 0 && (
+        <div className="feel-search-results">
+          {results.map((r, i) => {
+            const sel = selected.includes(r.word)
+            return (
+              <button
+                key={r.word}
+                className={`feel-node ${sel ? 'sel' : ''} ${i === cursor ? 'cursor' : ''}`}
+                style={{ '--fam': r.color } as CSSProperties}
+                onMouseEnter={() => setCursor(i)}
+                onClick={() => pick(r.word)}
+              >
+                {r.word}
+                <span className="feel-search-via">{r.via ?? r.family}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+      {q.trim() && results.length === 0 && (
+        <p className="muted small" style={{ margin: '8px 0 0' }}>
+          nothing matches "{q.trim()}"
+        </p>
+      )}
+    </div>
+  )
+}
+
 export default function FeelingsWheel({
   selected,
   onToggle,
@@ -107,13 +194,28 @@ export default function FeelingsWheel({
   onToggle: (word: string) => void
 }) {
   const [focused, setFocused] = useState<CoreFamily | null>(null)
+  const [searching, setSearching] = useState(false)
   const isSel = (w: string) => selected.includes(w)
+
+  if (searching) {
+    return (
+      <FeelingSearch selected={selected} onToggle={onToggle} onClose={() => setSearching(false)} />
+    )
+  }
 
   if (!focused) {
     const n = WHEEL.length
     const step = 360 / n
     return (
       <div className="wheel-wrap">
+        <button
+          className="btn-small btn-ghost wheel-search-btn"
+          onClick={() => setSearching(true)}
+          aria-label="search feelings"
+          title="search feelings"
+        >
+          ⌕
+        </button>
         <svg viewBox="0 0 360 360">
           {WHEEL.map((core, i) => {
             const start = i * step
@@ -177,13 +279,23 @@ export default function FeelingsWheel({
         <button className="btn-small btn-ghost" onClick={() => setFocused(null)}>
           ← all feelings
         </button>
-        <FeelNode
-          word={focused.name}
-          color={focused.color}
-          selected={isSel(focused.name)}
-          parent
-          onClick={() => onToggle(focused.name)}
-        />
+        <span className="row">
+          <FeelNode
+            word={focused.name}
+            color={focused.color}
+            selected={isSel(focused.name)}
+            parent
+            onClick={() => onToggle(focused.name)}
+          />
+          <button
+            className="btn-small btn-ghost"
+            onClick={() => setSearching(true)}
+            aria-label="search feelings"
+            title="search feelings"
+          >
+            ⌕
+          </button>
+        </span>
       </div>
       {focused.children.map((m) => (
         <div key={m.name} className="node-group">

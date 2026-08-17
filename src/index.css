@@ -367,7 +367,30 @@ label.field .label-text, .field .label-text {
 }
 
 /* ---------- feelings wheel ---------- */
-.wheel-wrap { max-width: 400px; margin: 0 auto; }
+.wheel-wrap { max-width: 400px; margin: 0 auto; position: relative; }
+.wheel-search-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  font-size: 15px;
+  z-index: 1;
+}
+.feel-search-results {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+}
+.feel-node.cursor {
+  border-color: color-mix(in srgb, var(--fam) 85%, transparent);
+  color: var(--text);
+}
+.feel-search-via {
+  margin-left: 8px;
+  font-size: 10px;
+  color: var(--text-mute);
+  letter-spacing: 0.04em;
+}
 .wheel-wrap svg { display: block; width: 100%; height: auto; }
 .wheel-wrap > button { margin-bottom: 4px; }
 
