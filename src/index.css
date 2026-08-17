@@ -298,6 +298,20 @@ label.field .label-text, .field .label-text {
 .sub-input { margin: 4px 0 10px 25px; }
 .sub-input input { padding: 6px 10px; font-size: 13px; }
 
+.editable { cursor: text; }
+.editable:hover { text-decoration: underline dotted var(--text-mute); text-underline-offset: 3px; }
+.editable-input {
+  flex: 1;
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 1px solid var(--accent-soft) !important;
+  border-radius: 0 !important;
+  padding: 0 0 2px !important;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.sub-item .editable-input { font-size: 13px; }
+
 .bucket-header {
   font-family: var(--mono);
   font-size: 10px;

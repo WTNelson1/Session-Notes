@@ -16,6 +16,8 @@ export interface PrepItem extends BaseRec {
   parentId?: string
   /** optional user-named group for top-level topics (e.g. "work", "vic") */
   bucket?: string
+  /** "the moment passed" — retired without being discussed; kept, restorable */
+  letGoAt?: number
 }
 
 export interface Session extends BaseRec {

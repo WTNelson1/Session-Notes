@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, alive, newRec, patch, softDelete, type PrepItem } from '../db'
+import EditableText from '../components/EditableText'
 
 function SubItemInput({ parentId }: { parentId: string }) {
   const [text, setText] = useState('')
@@ -101,8 +102,11 @@ export default function Prep() {
       .filter((i) => i.parentId === id)
       .sort((a, b) => a.createdAt - b.createdAt)
 
-  const open = tops.filter((i) => !i.done)
+  const open = tops.filter((i) => !i.done && !i.letGoAt)
   const done = tops.filter((i) => i.done)
+  const letGo = tops
+    .filter((i) => !i.done && i.letGoAt)
+    .sort((a, b) => (b.letGoAt ?? 0) - (a.letGoAt ?? 0))
 
   const buckets = [...new Set(open.map((i) => i.bucket).filter(Boolean) as string[])].sort()
   const inbox = open.filter((i) => !i.bucket)
@@ -114,12 +118,14 @@ export default function Prep() {
     setText('')
   }
 
+  const rename = (id: string) => (next: string) => patch(db.prepItems, id, { text: next })
+
   async function toggleTop(item: PrepItem) {
     if (item.done) {
       await patch(db.prepItems, item.id, { done: 0, doneAt: undefined })
     } else {
       // covering a topic covers its sub-items too
-      await patch(db.prepItems, item.id, { done: 1, doneAt: Date.now() })
+      await patch(db.prepItems, item.id, { done: 1, doneAt: Date.now(), letGoAt: undefined })
       for (const child of childrenOf(item.id).filter((c) => !c.done)) {
         await patch(db.prepItems, child.id, { done: 1, doneAt: Date.now() })
       }
@@ -134,16 +140,30 @@ export default function Prep() {
     )
   }
 
+  async function letItGo(item: PrepItem) {
+    await patch(db.prepItems, item.id, { letGoAt: Date.now() })
+    setPickingId(null)
+    setExpandedId(null)
+  }
+
+  async function revive(item: PrepItem) {
+    await patch(db.prepItems, item.id, { letGoAt: undefined })
+  }
+
   async function removeWithChildren(id: string) {
     for (const child of childrenOf(id)) await softDelete(db.prepItems, child.id)
     await softDelete(db.prepItems, id)
   }
 
-  function renderChildren(parent: PrepItem) {
+  function renderChildren(parent: PrepItem, editable = true) {
     return childrenOf(parent.id).map((c) => (
       <div key={c.id} className={`check-item sub-item ${c.done ? 'done' : ''}`}>
         <input type="checkbox" checked={!!c.done} onChange={() => toggleChild(c)} />
-        <span className="text">{c.text}</span>
+        {editable ? (
+          <EditableText className="text" value={c.text} onSave={rename(c.id)} />
+        ) : (
+          <span className="text">{c.text}</span>
+        )}
         <button
           className="btn-small btn-ghost"
           onClick={() => softDelete(db.prepItems, c.id)}
@@ -160,12 +180,12 @@ export default function Prep() {
       <div key={i.id} className="topic-group">
         <div className="check-item">
           <input type="checkbox" checked={false} onChange={() => toggleTop(i)} />
-          <span className="text">{i.text}</span>
+          <EditableText className="text" value={i.text} onSave={rename(i.id)} />
           <button
             className="btn-small btn-ghost"
             onClick={() => setPickingId(pickingId === i.id ? null : i.id)}
             aria-label="Move to bucket"
-            title="Move to bucket"
+            title="bucket"
           >
             ⌗
           </button>
@@ -173,14 +193,23 @@ export default function Prep() {
             className="btn-small btn-ghost"
             onClick={() => setExpandedId(expandedId === i.id ? null : i.id)}
             aria-label="Add sub-item"
-            title="Add sub-item"
+            title="add sub-item"
           >
             {expandedId === i.id ? '−' : '＋'}
           </button>
           <button
             className="btn-small btn-ghost"
+            onClick={() => letItGo(i)}
+            aria-label="Let it go"
+            title="let it go — the moment passed"
+          >
+            ⤓
+          </button>
+          <button
+            className="btn-small btn-ghost"
             onClick={() => removeWithChildren(i.id)}
             aria-label="Delete"
+            title="delete"
           >
             ×
           </button>
@@ -228,8 +257,8 @@ export default function Prep() {
           ))}
           {open.length === 0 && (
             <p className="muted small">
-              nothing queued · add thoughts as they come up — ＋ nests details under a topic · ⌗
-              files it into a bucket · check things off once discussed.
+              nothing queued · add thoughts as they come up — tap text to edit · ＋ nests details
+              · ⌗ files into a bucket · ⤓ lets a topic go · check things off once discussed.
             </p>
           )}
         </div>
@@ -251,10 +280,37 @@ export default function Prep() {
                   ×
                 </button>
               </div>
-              {renderChildren(i)}
+              {renderChildren(i, false)}
             </div>
           ))}
         </div>
+      )}
+
+      {letGo.length > 0 && (
+        <details className="help card">
+          <summary>let go · {letGo.length}</summary>
+          <p className="muted small" style={{ marginTop: 6 }}>
+            written down, never discussed — the moment passed. kept in case it comes back.
+          </p>
+          {letGo.map((i) => (
+            <div key={i.id} className="topic-group">
+              <div className="check-item">
+                <span className="text muted">{i.text}</span>
+                <button className="btn-small btn-ghost" onClick={() => revive(i)} title="back to the queue">
+                  ↩
+                </button>
+                <button
+                  className="btn-small btn-ghost"
+                  onClick={() => removeWithChildren(i.id)}
+                  aria-label="Delete"
+                >
+                  ×
+                </button>
+              </div>
+              {renderChildren(i, false)}
+            </div>
+          ))}
+        </details>
       )}
     </div>
   )
