@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, Route, Routes, useLocation, Link } from 'react-router-dom'
 import AppSwitcher from '@personal-os/kit/AppSwitcher'
-import TopNav from './components/TopNav'
 import Today from './pages/Today'
 import Prep from './pages/Prep'
 import Sessions from './pages/Sessions'
