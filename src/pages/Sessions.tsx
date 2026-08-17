@@ -43,7 +43,7 @@ export default function Sessions() {
 
   return (
     <div>
-      <Link to="/sessions/new" className="btn btn-solid" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', marginBottom: 14 }}>
+      <Link to="/sessions/new" className="btn btn-solid btn-cta">
         ＋ new session note
       </Link>
 

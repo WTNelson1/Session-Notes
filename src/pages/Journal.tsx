@@ -23,11 +23,7 @@ export default function Journal() {
 
   return (
     <div>
-      <Link
-        to="/journal/new"
-        className="btn btn-solid"
-        style={{ display: 'block', textAlign: 'center', textDecoration: 'none', marginBottom: 14 }}
-      >
+      <Link to="/journal/new" className="btn btn-solid btn-cta">
         ＋ new entry
       </Link>
 

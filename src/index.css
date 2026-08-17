@@ -305,3 +305,132 @@ details.help p, details.help ol {
 }
 .checkin-page h1, .checkin-page h2 { font-weight: 500; letter-spacing: -0.02em; }
 .big-check { font-size: 52px; color: var(--accent); font-family: var(--mono); }
+
+/* The page-opening primary action. In the narrow column it reads as a full-
+   bleed CTA bar; on a wide screen a 950px slab of brass does not, so it caps
+   below (see the wide-screen block). */
+.btn-cta {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+  margin-bottom: 14px;
+}
+
+/* ---------- wide-screen chrome ---------- */
+/* Helm's desktop nav, ported: a sticky bar of folder tabs with the wordmark on
+   the left and the header actions pushed right. Below the breakpoint this bar
+   is hidden and the scrolling header + fixed bottom bar take over — the two
+   navs are both in the DOM but never share the screen. 900px is the flip: the
+   bar wants ~750px before the tabs crowd the wordmark, so a portrait tablet
+   stays on the bottom bar and anything landscape/desktop gets tabs. */
+.top-nav { display: none; }
+
+@media (min-width: 900px) {
+  :root {
+    /* The content column widens with the nav so the two share an edge. */
+    --kit-shell-max: 1000px;
+  }
+
+  .top-nav {
+    display: block;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: color-mix(in srgb, var(--bg) 90%, transparent);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line-soft);
+  }
+
+  .top-nav-inner {
+    max-width: var(--kit-shell-max);
+    margin: 0 auto;
+    /* No bottom padding: the tabs sit on the bar's hairline. */
+    padding: 12px 24px 0;
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+  }
+
+  .top-nav-brand {
+    display: flex;
+    align-items: center;
+    margin: 0 16px 11px 0;
+    padding-right: 16px;
+    border-right: 1px solid var(--line-soft);
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: lowercase;
+  }
+
+  /* The same live dot the narrow header carries (kit nav.css). */
+  .top-nav-brand::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    margin-right: 9px;
+    flex-shrink: 0;
+    animation: kit-pulse 2.4s ease-in-out infinite;
+  }
+
+  .top-nav-tabs {
+    display: flex;
+    align-items: flex-end;
+  }
+
+  /* Each tab overlaps its neighbours by half the shoulder, so the row reads as
+     one set of folder tabs rather than five separate shapes. */
+  .nav-tab {
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    width: 128px;
+    height: 48px;
+    margin: 0 -12px;
+    padding-bottom: 7px;
+    text-decoration: none;
+  }
+
+  .nav-tab:first-child { margin-left: 0; }
+
+  .nav-tab svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .nav-tab span {
+    position: relative;
+    z-index: 1;
+    font-size: 13.5px;
+    color: var(--text-dim);
+    transition: color 0.15s;
+  }
+
+  .nav-tab:hover span,
+  .nav-tab.active span { color: var(--text); }
+
+  /* Beats the inline stroke attribute, so a resting tab lifts on hover. */
+  .nav-tab:not(.active):hover svg path + path { stroke: var(--line); }
+
+  .top-nav-actions { margin: 0 0 10px auto; }
+
+  /* One chrome row on wide screens: the header and the bottom bar step aside. */
+  .app-header,
+  .bottom-nav { display: none; }
+
+  .app-shell { padding: 20px 24px 48px; }
+
+  .btn-cta { max-width: 260px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .top-nav-brand::before { animation: none; }
+}

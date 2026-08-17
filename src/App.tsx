@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { NavLink, Route, Routes, useLocation, Link } from 'react-router-dom'
 import AppSwitcher from '@personal-os/kit/AppSwitcher'
+import TopNav from './components/TopNav'
 import Today from './pages/Today'
 import Prep from './pages/Prep'
 import Sessions from './pages/Sessions'
@@ -16,11 +17,15 @@ import { syncConfigured } from './settings'
 
 type SyncState = 'idle' | 'syncing' | 'ok' | 'error'
 
-function SyncButton() {
+// One sync engine per mount. The button itself renders twice — once in the
+// wide top bar, once in the narrow header — and only one of the two is ever on
+// screen, so the state and the auto-sync subscription live up here rather than
+// inside the button, or opening the app would sync twice.
+function useSync() {
   const [state, setState] = useState<SyncState>('idle')
   const [error, setError] = useState('')
 
-  async function run(silent = false) {
+  const run = useCallback(async (silent = false) => {
     if (!syncConfigured()) {
       if (!silent) setError('set up sync in settings first.')
       return
@@ -35,7 +40,7 @@ function SyncButton() {
       setState('error')
       if (!silent) setError(e instanceof Error ? e.message.toLowerCase() : 'sync failed')
     }
-  }
+  }, [])
 
   useEffect(() => {
     // pull the latest from other devices on app open, then push every local
@@ -48,6 +53,11 @@ function SyncButton() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  return { state, error, run }
+}
+
+function SyncButton({ sync }: { sync: ReturnType<typeof useSync> }) {
+  const { state, error, run } = sync
   const label =
     state === 'syncing' ? '…' : state === 'ok' ? '✓' : state === 'error' ? '✶' : '↻'
   return (
@@ -71,6 +81,7 @@ function SyncButton() {
 const APPS = [
   { name: 'helm', url: 'https://helm-blush.vercel.app', color: '#7ad6c0' },
   { name: 'anchor', url: 'https://wtnelson1.github.io/Session-Notes/', color: '#e8b64c' },
+  { name: 'bounty', url: 'https://wtnelson1.github.io/bounty/', color: '#d08a5a' },
 ]
 
 const NAV = [
@@ -85,6 +96,8 @@ export default function App() {
   const location = useLocation()
   const isCheckin = location.pathname.startsWith('/checkin')
 
+  // Check-in is a standalone screen with no chrome — and no sync, which is why
+  // it returns before <Shell /> rather than hiding the nav inside it.
   if (isCheckin) {
     return (
       <Routes>
@@ -93,45 +106,62 @@ export default function App() {
     )
   }
 
+  return <Shell />
+}
+
+function Shell() {
+  const sync = useSync()
+
+  // The same two controls sit at the right end of whichever nav is showing.
+  const actions = (
+    <>
+      <SyncButton sync={sync} />
+      <Link to="/settings" className="btn btn-small btn-ghost" aria-label="Settings">
+        ⚙
+      </Link>
+    </>
+  )
+
   return (
-    <div className="app-shell">
-      <header className="app-header">
-        <h1>
-          <AppSwitcher apps={APPS} current="anchor" />
-        </h1>
-        <div className="header-actions">
-          <SyncButton />
-          <Link to="/settings" className="btn btn-small btn-ghost" aria-label="Settings">
-            ⚙
-          </Link>
-        </div>
-      </header>
+    <>
+      {/* Wide screens get Helm's folder tabs; narrow screens get the header +
+          bottom bar. Both are always rendered — index.css shows one. */}
+      <TopNav items={NAV} apps={APPS} current="anchor" actions={actions} />
 
-      <Routes>
-        <Route path="/" element={<Today />} />
-        <Route path="/journal" element={<Journal />} />
-        <Route path="/journal/:id" element={<JournalEntry />} />
-        <Route path="/prep" element={<Prep />} />
-        <Route path="/sessions" element={<Sessions />} />
-        <Route path="/sessions/:id" element={<SessionDetail />} />
-        <Route path="/practices" element={<Practices />} />
-        <Route path="/insights" element={<Insights />} />
-        <Route path="/settings" element={<Settings />} />
-      </Routes>
+      <div className="app-shell">
+        <header className="app-header">
+          <h1>
+            <AppSwitcher apps={APPS} current="anchor" />
+          </h1>
+          <div className="header-actions">{actions}</div>
+        </header>
 
-      <nav className="bottom-nav">
-        {NAV.map((n) => (
-          <NavLink
-            key={n.to}
-            to={n.to}
-            end={n.end}
-            className={({ isActive }) => (isActive ? 'active' : '')}
-          >
-            <span className="icon">{n.glyph}</span>
-            {n.label}
-          </NavLink>
-        ))}
-      </nav>
-    </div>
+        <Routes>
+          <Route path="/" element={<Today />} />
+          <Route path="/journal" element={<Journal />} />
+          <Route path="/journal/:id" element={<JournalEntry />} />
+          <Route path="/prep" element={<Prep />} />
+          <Route path="/sessions" element={<Sessions />} />
+          <Route path="/sessions/:id" element={<SessionDetail />} />
+          <Route path="/practices" element={<Practices />} />
+          <Route path="/insights" element={<Insights />} />
+          <Route path="/settings" element={<Settings />} />
+        </Routes>
+
+        <nav className="bottom-nav">
+          {NAV.map((n) => (
+            <NavLink
+              key={n.to}
+              to={n.to}
+              end={n.end}
+              className={({ isActive }) => (isActive ? 'active' : '')}
+            >
+              <span className="icon">{n.glyph}</span>
+              {n.label}
+            </NavLink>
+          ))}
+        </nav>
+      </div>
+    </>
   )
 }
