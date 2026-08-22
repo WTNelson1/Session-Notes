@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { db, alive, todayStr } from './db'
+import { db, alive, stillOpen, todayStr } from './db'
 import { getSetting } from './settings'
 
 /** optional user-provided context (pronouns, names, anything) for every AI call */
@@ -130,14 +130,23 @@ export async function buildContext(sinceDays: number | null): Promise<string> {
       ? `"${p.text}" (details: ${subs.map((c) => `"${c.text}"`).join('; ')})`
       : `"${p.text}"`
   }
-  const openPrep = prep.filter((p) => !p.done && !p.parentId)
+  const openPrep = prep.filter((p) => !p.parentId && stillOpen(p))
   const coveredPrep = prep.filter((p) => p.done && !p.parentId)
-  if (openPrep.length || coveredPrep.length) {
+  // Deliberately kept, and kept separate: what someone writes down and then
+  // releases without ever raising it is a pattern worth seeing, but calling it
+  // "not yet discussed" would be the opposite of what happened.
+  const letGoPrep = prep.filter((p) => !p.done && p.letGoAt && !p.parentId)
+  if (openPrep.length || coveredPrep.length || letGoPrep.length) {
     parts.push('## Session-prep topics')
     if (openPrep.length)
       parts.push('Not yet discussed: ' + openPrep.map(describeTopic).join('; '))
     if (coveredPrep.length)
       parts.push('Already covered: ' + coveredPrep.map(describeTopic).join('; '))
+    if (letGoPrep.length)
+      parts.push(
+        'Written down but let go, never discussed (the moment passed): ' +
+          letGoPrep.map(describeTopic).join('; '),
+      )
   }
 
   return parts.join('\n\n')
@@ -282,4 +291,123 @@ export async function runInsight(
     .filter((b) => b.type === 'text')
     .map((b) => b.text)
     .join('')
+}
+
+/* ---------- brain dump → prep topics ---------- */
+
+export interface DumpTopic {
+  /** the topic line, as it will read in the prep queue */
+  text: string
+  /** one of the author's existing buckets, or '' for the inbox */
+  bucket: string
+  /** the specifics that belong under it, as sub-items */
+  details: string[]
+}
+
+const DUMP_SYSTEM = `You turn a brain dump into session-prep topics for a private therapy app.
+
+The author writes messily and out of order — half sentences, tangents, several things tangled in one paragraph. Your job is to separate the threads and tighten each one into a line they will recognize at a glance. You are sorting their words, not interpreting them.
+
+Rules:
+- One topic per distinct thing worth raising. Split what is tangled together; never merge two unrelated threads to make a tidier list.
+- Keep the author's own words and framing. Fix grammar and cut filler, but do not translate what they wrote into clinical or therapeutic language, and do not add insight, diagnosis, or advice they did not write themselves.
+- Topic lines: lowercase, plain, at most about ten words, no trailing period.
+- details: the specifics from the dump that sit under that topic, each one short and lowercase. Leave the array empty when the dump has no specifics — never invent detail to fill it.
+- Not everything is a topic. Venting with no ask, or a passing mood, can be dropped. Prefer fewer true topics over covering every sentence.
+- If you must refer to the author, say "you" — never guess their pronouns or gender.
+- bucket: use one of the author's existing buckets only when it clearly fits, spelled exactly as given; otherwise use an empty string. Never invent a bucket name.
+
+Return your answer only by calling the topics tool.`
+
+const TOPICS_TOOL: Anthropic.Beta.BetaTool = {
+  name: 'topics',
+  description: 'Return the session-prep topics found in the brain dump.',
+  strict: true,
+  input_schema: {
+    type: 'object',
+    properties: {
+      topics: {
+        type: 'array',
+        description: 'One entry per topic, in the order they came up in the dump.',
+        items: {
+          type: 'object',
+          properties: {
+            text: { type: 'string', description: 'the topic line, lowercase, ~10 words max' },
+            bucket: {
+              type: 'string',
+              description: 'an existing bucket name, or an empty string for none',
+            },
+            details: {
+              type: 'array',
+              description: 'short specifics under this topic; empty array if none',
+              items: { type: 'string' },
+            },
+          },
+          required: ['text', 'bucket', 'details'],
+          additionalProperties: false,
+        },
+      },
+    },
+    required: ['topics'],
+    additionalProperties: false,
+  },
+}
+
+const MAX_TOPICS = 20
+const MAX_DETAILS = 8
+
+/** Trust nothing that comes back: shape it, trim it, cap it, drop the junk. */
+export function normalizeTopics(raw: unknown, buckets: string[]): DumpTopic[] {
+  const list = (raw as { topics?: unknown } | null)?.topics
+  if (!Array.isArray(list)) return []
+  const clean = (v: unknown, max: number) =>
+    typeof v === 'string' ? v.trim().replace(/\s+/g, ' ').slice(0, max) : ''
+  const known = new Set(buckets)
+  const seen = new Set<string>()
+  const out: DumpTopic[] = []
+  for (const item of list) {
+    const t = item as { text?: unknown; bucket?: unknown; details?: unknown }
+    const text = clean(t?.text, 200)
+    if (!text || seen.has(text.toLowerCase())) continue
+    seen.add(text.toLowerCase())
+    const bucket = clean(t?.bucket, 40).toLowerCase()
+    const details = Array.isArray(t?.details)
+      ? (t.details as unknown[]).map((d) => clean(d, 300)).filter(Boolean).slice(0, MAX_DETAILS)
+      : []
+    // an invented bucket name lands in the inbox rather than starting a new pile
+    out.push({ text, bucket: known.has(bucket) ? bucket : '', details })
+    if (out.length >= MAX_TOPICS) break
+  }
+  return out
+}
+
+/** Parse a brain dump into reviewable prep topics. Nothing is saved here. */
+export async function bulletsFromDump(
+  apiKey: string,
+  dump: string,
+  buckets: string[],
+): Promise<DumpTopic[]> {
+  const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true })
+  const resp = await client.beta.messages.create({
+    model: 'claude-opus-5',
+    max_tokens: 2000,
+    betas: ['server-side-fallback-2026-06-01'],
+    fallbacks: [{ model: 'claude-opus-4-8' }],
+    system: DUMP_SYSTEM + aboutBlock(),
+    tools: [TOPICS_TOOL],
+    tool_choice: { type: 'tool', name: 'topics' },
+    messages: [
+      {
+        role: 'user',
+        content: `My existing buckets: ${buckets.length ? buckets.join(', ') : '(none yet)'}\n\nHere is the dump:\n\n<dump>\n${dump}\n</dump>`,
+      },
+    ],
+  })
+  if (resp.stop_reason === 'refusal') {
+    throw new Error('the model declined this one — you can still add topics by hand')
+  }
+  for (const block of resp.content) {
+    if (block.type === 'tool_use') return normalizeTopics(block.input, buckets)
+  }
+  throw new Error('nothing came back — try again')
 }

@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, alive, newRec, patch, softDelete, type PrepItem } from '../db'
+import { db, alive, newRec, patch, softDelete, stillOpen, type PrepItem } from '../db'
 import EditableText from '../components/EditableText'
+import { bulletsFromDump, type DumpTopic } from '../ai'
+import { getSetting } from '../settings'
+import { useDraft } from '../autosave'
 
 function SubItemInput({ parentId }: { parentId: string }) {
   const [text, setText] = useState('')
@@ -87,6 +90,193 @@ function BucketPicker({
   )
 }
 
+const DUMP_KEY = 'anchor.dump'
+const DRAFT_KEY = 'anchor.dumpDraft'
+
+/** Messy in, reviewable topics out. Nothing reaches the queue until you say so. */
+function BrainDump({ buckets }: { buckets: string[] }) {
+  const [dump, setDump] = useDraft(DUMP_KEY, '')
+  const [draft, setDraft] = useDraft<DumpTopic[] | null>(DRAFT_KEY, null)
+  const [open, setOpen] = useState(() => !!dump || !!draft)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  const apiKey = getSetting('apiKey')
+
+  const editTopic = (i: number, changes: Partial<DumpTopic>) =>
+    setDraft((d) => d && d.map((t, n) => (n === i ? { ...t, ...changes } : t)))
+  const dropTopic = (i: number) => setDraft((d) => d && d.filter((_, n) => n !== i))
+  const editDetail = (i: number, j: number, next: string) =>
+    setDraft(
+      (d) =>
+        d && d.map((t, n) => (n === i ? { ...t, details: t.details.map((x, m) => (m === j ? next : x)) } : t)),
+    )
+  const dropDetail = (i: number, j: number) =>
+    setDraft(
+      (d) => d && d.map((t, n) => (n === i ? { ...t, details: t.details.filter((_, m) => m !== j) } : t)),
+    )
+
+  async function parse() {
+    setBusy(true)
+    setError('')
+    try {
+      const topics = await bulletsFromDump(apiKey, dump.trim(), buckets)
+      if (topics.length) setDraft(topics)
+      else setError('nothing in there read as a topic — add a bit more, or write it in by hand')
+    } catch (e) {
+      setError(e instanceof Error ? e.message.toLowerCase() : 'that did not go through')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** Everything you kept, in the order you reviewed it. */
+  async function commit() {
+    if (!draft?.length) return
+    const base = Date.now()
+    for (let i = 0; i < draft.length; i++) {
+      const t = draft[i]
+      // stamped so the queue (newest first) reads in the order of the draft
+      const at = base + (draft.length - i)
+      const parent = { ...newRec(), createdAt: at, updatedAt: at }
+      await db.prepItems.add({
+        ...parent,
+        text: t.text,
+        done: 0,
+        bucket: t.bucket || undefined,
+      })
+      for (let j = 0; j < t.details.length; j++) {
+        // siblings only ever sort against each other, so a local counter is enough
+        await db.prepItems.add({
+          ...newRec(),
+          createdAt: base + j,
+          updatedAt: base + j,
+          text: t.details[j],
+          done: 0,
+          parentId: parent.id,
+        })
+      }
+    }
+    setDraft(null)
+    setDump('')
+    setOpen(false)
+  }
+
+  if (!open) {
+    return (
+      <button className="btn-small btn-ghost dump-toggle" onClick={() => setOpen(true)}>
+        ✦ brain dump
+      </button>
+    )
+  }
+
+  return (
+    <div className="dump">
+      {!draft && (
+        <>
+          <textarea
+            rows={5}
+            placeholder="everything on your mind — messy, out of order, half-sentences. it gets sorted, not judged."
+            value={dump}
+            onChange={(e) => setDump(e.target.value)}
+          />
+          <div className="row">
+            <button
+              className="btn-primary btn-small"
+              disabled={!dump.trim() || !apiKey || busy}
+              onClick={() => void parse()}
+            >
+              {busy ? 'sorting…' : '✦ make bullets'}
+            </button>
+            <button
+              className="btn-small btn-ghost"
+              onClick={() => {
+                setError('')
+                setOpen(false)
+              }}
+            >
+              close
+            </button>
+            {!apiKey && <span className="muted small">add your api key in settings first</span>}
+          </div>
+        </>
+      )}
+
+      {draft && (
+        <>
+          <p className="bucket-header">
+            review · {draft.length} topic{draft.length === 1 ? '' : 's'} · nothing saved yet
+          </p>
+          {draft.map((t, i) => (
+            <div key={i} className="topic-group">
+              <div className="check-item">
+                <EditableText
+                  className="text"
+                  value={t.text}
+                  onSave={(next) => editTopic(i, { text: next })}
+                />
+                <select
+                  className="dump-bucket"
+                  value={t.bucket}
+                  onChange={(e) => editTopic(i, { bucket: e.target.value })}
+                  aria-label="Bucket"
+                >
+                  <option value="">no bucket</option>
+                  {buckets.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  className="btn-small btn-ghost"
+                  onClick={() => dropTopic(i)}
+                  aria-label="Drop"
+                  title="drop"
+                >
+                  ×
+                </button>
+              </div>
+              {t.details.map((d, j) => (
+                <div key={j} className="check-item sub-item">
+                  <EditableText
+                    className="text"
+                    value={d}
+                    onSave={(next) => editDetail(i, j, next)}
+                  />
+                  <button
+                    className="btn-small btn-ghost"
+                    onClick={() => dropDetail(i, j)}
+                    aria-label="Drop"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          ))}
+          <div className="row" style={{ marginTop: 10 }}>
+            <button className="btn-primary btn-small" onClick={() => void commit()}>
+              add {draft.length} to prep
+            </button>
+            <button className="btn-small btn-ghost" onClick={() => setDraft(null)}>
+              back to the text
+            </button>
+          </div>
+          <details className="help">
+            <summary>what you wrote</summary>
+            <p className="muted small" style={{ whiteSpace: 'pre-wrap' }}>
+              {dump}
+            </p>
+          </details>
+        </>
+      )}
+
+      {error && <p className="error-text small">{error}</p>}
+    </div>
+  )
+}
+
 export default function Prep() {
   const [text, setText] = useState('')
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -102,7 +292,7 @@ export default function Prep() {
       .filter((i) => i.parentId === id)
       .sort((a, b) => a.createdAt - b.createdAt)
 
-  const open = tops.filter((i) => !i.done && !i.letGoAt)
+  const open = tops.filter(stillOpen)
   const done = tops.filter((i) => i.done)
   const letGo = tops
     .filter((i) => !i.done && i.letGoAt)
@@ -244,6 +434,8 @@ export default function Prep() {
             Add
           </button>
         </form>
+
+        <BrainDump buckets={buckets} />
 
         <div style={{ marginTop: 10 }}>
           {inbox.map(renderTopic)}

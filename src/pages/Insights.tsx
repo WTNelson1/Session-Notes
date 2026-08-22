@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, alive, newRec, softDelete } from '../db'
 import { PRESETS, buildContext, runInsight } from '../ai'
 import { getSetting } from '../settings'
+import { useDraft } from '../autosave'
 
 const RANGES = [
   { label: 'Last 30 days', days: 30 },
@@ -14,10 +15,12 @@ const RANGES = [
 export default function Insights() {
   const apiKey = getSetting('apiKey')
   const [rangeIdx, setRangeIdx] = useState(1)
-  const [custom, setCustom] = useState('')
+  const [custom, setCustom] = useDraft('anchor.insightQuestion', '')
   const [running, setRunning] = useState(false)
-  const [output, setOutput] = useState('')
-  const [activeTitle, setActiveTitle] = useState('')
+  // an insight costs an api call and arrives a token at a time; it survives
+  // navigation and reload until you file it or throw it away
+  const [output, setOutput] = useDraft('anchor.insightDraft', '')
+  const [activeTitle, setActiveTitle] = useDraft('anchor.insightTitle', '')
   const [error, setError] = useState('')
   const outputRef = useRef<HTMLDivElement>(null)
 

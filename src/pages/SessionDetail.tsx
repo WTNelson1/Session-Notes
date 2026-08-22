@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, alive, newRec, patch, softDelete, todayStr, type PrepItem } from '../db'
+import { db, alive, newRec, patch, softDelete, stillOpen, todayStr, type PrepItem } from '../db'
 import OutlineEditor, {
   parseOutline,
   serializeOutline,
@@ -9,6 +9,11 @@ import OutlineEditor, {
 } from '../components/OutlineEditor'
 import { summarizeSession, reviewSession, textHash, REVIEW_MIN_CHARS } from '../ai'
 import { getSetting } from '../settings'
+import { useAutosave } from '../autosave'
+
+/** what a note looks like on disk — autosave compares these, not object identity */
+const sig = (date: string, notes: string, takeaways: string) =>
+  `${date}\u0000${notes}\u0000${takeaways}`
 
 export default function SessionDetail() {
   const { id } = useParams()
@@ -38,6 +43,9 @@ export default function SessionDetail() {
         setTakeaways(s.takeaways)
         setSummary(s.summary ?? '')
         setReview(s.review ?? '')
+        // what is already on disk, round-tripped the way autosave will write it,
+        // so merely opening a note never schedules a pointless rewrite
+        markSaved(sig(s.date, serializeOutline(parseOutline(s.notes)), s.takeaways))
         // reviews auto-run for substantial notes and cache by content hash
         void maybeReview(s.id)
       }
@@ -48,7 +56,7 @@ export default function SessionDetail() {
 
   const prepItems = useLiveQuery(async () => (await db.prepItems.toArray()).filter(alive))
   const openTops = (prepItems ?? [])
-    .filter((p) => !p.parentId && !p.done)
+    .filter((p) => !p.parentId && stillOpen(p))
     .sort((a, b) => b.createdAt - a.createdAt)
   const childrenOf = (pid: string) =>
     (prepItems ?? []).filter((p) => p.parentId === pid).sort((a, b) => a.createdAt - b.createdAt)
@@ -80,6 +88,18 @@ export default function SessionDetail() {
     void maybeSummarize(sid)
     void maybeReview(sid)
   }
+
+  // The note is written to the local db as you type. This deliberately does not
+  // call Claude — the ✦ summary and review stay behind the save button, so notes
+  // still only leave the device on an explicit action.
+  const notes = serializeOutline(outline)
+  const { state: autoState, markSaved } = useAutosave({
+    ready: loaded,
+    signature: sig(date, notes, takeaways),
+    // opening the page must not conjure an empty session into the list
+    skip: !sessionId && !notes.trim() && !takeaways.trim(),
+    save,
+  })
 
   /** background: five-section review, only for substantial notes, cached by hash */
   async function maybeReview(sid: string) {
@@ -189,6 +209,11 @@ export default function SessionDetail() {
             <button className="btn-primary" onClick={saveAndFlash}>
               {savedFlash ? 'saved ✓' : 'save'}
             </button>
+            {!savedFlash && autoState !== 'idle' && (
+              <span className="muted small">
+                {autoState === 'saving' ? 'saving…' : 'saved as you type'}
+              </span>
+            )}
             {summarizing && (
               <span className="muted small" style={{ color: 'var(--accent)' }}>
                 ✦ summarizing…

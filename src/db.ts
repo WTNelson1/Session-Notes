@@ -110,6 +110,16 @@ export function alive<T extends BaseRec>(r: T): boolean {
   return !r.deleted
 }
 
+/**
+ * A prep topic still in play — neither covered nor let go. `letGoAt` was added
+ * after most of these lists were written, and only Prep learned about it, so
+ * every other surface kept offering topics the user had already released. Keep
+ * the test here: the queue has to mean the same thing everywhere it appears.
+ */
+export function stillOpen(p: PrepItem): boolean {
+  return !p.done && !p.letGoAt
+}
+
 export async function patch<T extends BaseRec>(
   table: Table<T, string>,
   id: string,

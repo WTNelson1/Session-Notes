@@ -434,3 +434,28 @@ details.help p, details.help ol {
 @media (prefers-reduced-motion: reduce) {
   .top-nav-brand::before { animation: none; }
 }
+
+/* ---------- brain dump ---------- */
+/* Folded away until asked for: Prep's job is the queue, and an always-open
+   textarea would put a blank page between you and it. */
+.dump-toggle { margin-top: 8px; }
+
+.dump {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.dump textarea { margin-bottom: 8px; }
+
+.dump-bucket {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: lowercase;
+  padding: 3px 6px;
+  width: auto;
+  flex-shrink: 0;
+  color: var(--text-mute);
+}
+
+.dump .topic-group .check-item { padding-left: 0; }

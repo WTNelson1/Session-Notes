@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { db, TABLES, alive, patch } from '../db'
 import { getSetting, setSetting, type SettingKey } from '../settings'
 import { localSnapshot, importData, syncNow } from '../sync'
@@ -19,6 +19,34 @@ function SettingInput({
 }) {
   const [value, setValue] = useState(getSetting(settingKey))
   const [show, setShow] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // macOS turns on Secure Event Input while a password field holds focus, and
+  // the browser only turns it back off once focus leaves. Leave the window
+  // with the cursor still sitting in the api key, token, or passphrase and it
+  // can stay on system-wide, eating other apps' keystrokes. So let the field
+  // go the moment the page stops being the thing you are looking at.
+  useEffect(() => {
+    if (!password) return
+    const release = () => {
+      if (inputRef.current && document.activeElement === inputRef.current) {
+        inputRef.current.blur()
+      }
+    }
+    const onVisibility = () => {
+      if (document.hidden) release()
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('pagehide', release)
+    // Fires on cmd-tab, when the window is still visible but no longer yours.
+    window.addEventListener('blur', release)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('pagehide', release)
+      window.removeEventListener('blur', release)
+      release() // and on unmount — leaving settings must not hold it either
+    }
+  }, [password])
 
   function commit(v: string) {
     setValue(v)
@@ -38,6 +66,7 @@ function SettingInput({
       ) : (
         <div className="row">
           <input
+            ref={inputRef}
             type={password && !show ? 'password' : 'text'}
             placeholder={placeholder}
             value={value}

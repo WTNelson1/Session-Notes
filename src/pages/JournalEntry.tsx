@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { db, newRec, patch, softDelete } from '../db'
+import { useAutosave } from '../autosave'
 import FeelingsWheel from '../components/FeelingsWheel'
 import FeelingChips from '../components/FeelingChips'
+
+/** what an entry looks like on disk — autosave compares these */
+const sig = (words: string[], text: string) => `${words.join('\u0000')}\u0001${text}`
 
 export default function JournalEntry() {
   const { id } = useParams()
@@ -17,6 +21,16 @@ export default function JournalEntry() {
   const [savedFlash, setSavedFlash] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
 
+  // Written as you pick feelings and as you type — the wheel selection is work
+  // too, and losing a paragraph to a backgrounded tab was the old failure.
+  const { state: autoState, markSaved } = useAutosave({
+    ready: loaded,
+    signature: sig(words, text),
+    // an untouched new entry stays out of the journal list
+    skip: !entryId && words.length === 0 && !text.trim(),
+    save,
+  })
+
   useEffect(() => {
     if (isNew || !id) return
     void db.journal.get(id).then((e) => {
@@ -24,10 +38,11 @@ export default function JournalEntry() {
         setWords(e.words)
         setText(e.text)
         setAt(e.at)
+        markSaved(sig(e.words, e.text))
       }
       setLoaded(true)
     })
-  }, [id, isNew])
+  }, [id, isNew, markSaved])
 
   function toggle(word: string) {
     setWords((w) => (w.includes(word) ? w.filter((x) => x !== word) : [...w, word]))
@@ -41,6 +56,10 @@ export default function JournalEntry() {
       await db.journal.add(rec)
       setEntryId(rec.id)
     }
+  }
+
+  async function saveAndFlash() {
+    await save()
     setSavedFlash(true)
     setTimeout(() => setSavedFlash(false), 1500)
   }
@@ -70,9 +89,20 @@ export default function JournalEntry() {
           rows={6}
         />
         <div className="row-between" style={{ marginTop: 10 }}>
-          <button className="btn-primary" onClick={save} disabled={words.length === 0 && !text.trim()}>
-            {savedFlash ? 'saved ✓' : 'save'}
-          </button>
+          <span className="row">
+            <button
+              className="btn-primary"
+              onClick={saveAndFlash}
+              disabled={words.length === 0 && !text.trim()}
+            >
+              {savedFlash ? 'saved ✓' : 'save'}
+            </button>
+            {!savedFlash && autoState !== 'idle' && (
+              <span className="muted small">
+                {autoState === 'saving' ? 'saving…' : 'saved as you type'}
+              </span>
+            )}
+          </span>
           {entryId &&
             (confirmingDelete ? (
               <span className="row">

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, alive, newRec, softDelete, todayStr } from '../db'
+import { db, alive, newRec, softDelete, todayStr, stillOpen } from '../db'
 import FeelingChips from '../components/FeelingChips'
 import FeelingsWheel from '../components/FeelingsWheel'
 
@@ -14,7 +14,7 @@ export default function Today() {
 
   const openPrep = useLiveQuery(async () =>
     (await db.prepItems.where('done').equals(0).toArray()).filter(
-      (p) => alive(p) && !p.parentId,
+      (p) => alive(p) && !p.parentId && stillOpen(p),
     ),
   )
   const practices = useLiveQuery(async () =>
