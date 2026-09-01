@@ -12,6 +12,7 @@ import Settings from './pages/Settings'
 import Checkin from './pages/Checkin'
 import Journal from './pages/Journal'
 import JournalEntry from './pages/JournalEntry'
+import OneSheet from './pages/OneSheet'
 import { initAutoSync, syncNow } from './sync'
 import { syncConfigured } from './settings'
 
@@ -141,6 +142,7 @@ function Shell() {
           <Route path="/journal" element={<Journal />} />
           <Route path="/journal/:id" element={<JournalEntry />} />
           <Route path="/prep" element={<Prep />} />
+          <Route path="/onesheet" element={<OneSheet />} />
           <Route path="/sessions" element={<Sessions />} />
           <Route path="/sessions/:id" element={<SessionDetail />} />
           <Route path="/practices" element={<Practices />} />

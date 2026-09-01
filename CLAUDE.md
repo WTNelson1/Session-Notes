@@ -11,7 +11,7 @@ Vite + React + TypeScript · Dexie (IndexedDB) · vite-plugin-pwa · `@anthropic
 - `src/ai.ts` — all Claude calls: insights (streamed), session summary, session review; `aboutBlock()` appends the user's context to every system prompt
 - `src/feelings.ts` — the wheel taxonomy + flat search index
 - `src/components/FeelingsWheel.tsx` — family wheel → mind-map nodes → ⌕ search
-- `src/pages/*` — Today (quick-action hub), Journal, Prep, Sessions, Practices, Insights, Settings, Checkin
+- `src/pages/*` — Today (quick-action hub), Journal, Prep (incl. ✦ brain dump), OneSheet (printable session sheet for the therapist; print CSS in index.css), Sessions, Practices, Insights, Settings, Checkin
 - `docs/` — Helm design language + floating-matrix background briefs (the visual system this app follows)
 
 ## Conventions

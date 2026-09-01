@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, alive, newRec, patch, softDelete, stillOpen, type PrepItem } from '../db'
 import EditableText from '../components/EditableText'
@@ -435,7 +436,12 @@ export default function Prep() {
           </button>
         </form>
 
-        <BrainDump buckets={buckets} />
+        <div className="row">
+          <BrainDump buckets={buckets} />
+          <Link to="/onesheet" className="btn btn-small btn-ghost dump-toggle" style={{ textDecoration: 'none' }}>
+            ⎙ session sheet
+          </Link>
+        </div>
 
         <div style={{ marginTop: 10 }}>
           {inbox.map(renderTopic)}
