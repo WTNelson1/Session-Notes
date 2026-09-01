@@ -13,9 +13,11 @@ export default function Today() {
   const [jotFlash, setJotFlash] = useState(false)
 
   const openPrep = useLiveQuery(async () =>
-    (await db.prepItems.where('done').equals(0).toArray()).filter(
-      (p) => alive(p) && !p.parentId && stillOpen(p),
-    ),
+    (await db.prepItems.where('done').equals(0).toArray())
+      .filter((p) => alive(p) && !p.parentId && stillOpen(p))
+      // newest first, matching prep — without this Dexie hands back index
+      // order (UUID keys, i.e. shuffled), so a fresh jot could land anywhere
+      .sort((a, b) => b.createdAt - a.createdAt),
   )
   const practices = useLiveQuery(async () =>
     (await db.practices.where('active').equals(1).toArray()).filter(alive),
