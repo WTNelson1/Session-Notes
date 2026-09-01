@@ -509,3 +509,13 @@ details.help p, details.help ol {
   .onesheet .sheet-tag { color: #6a707d; }
   .onesheet .muted { color: #6a707d; }
 }
+
+/* screen-only handle for shifting a topic across the sheet's new/carried
+   split — the guess is sometimes wrong, and her copy never shows the handle */
+.sheet-move {
+  font-size: 9px;
+  padding: 1px 6px;
+  margin-left: 8px;
+  vertical-align: 1px;
+  opacity: 0.75;
+}

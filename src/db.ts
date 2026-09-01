@@ -18,6 +18,13 @@ export interface PrepItem extends BaseRec {
   bucket?: string
   /** "the moment passed" — retired without being discussed; kept, restorable */
   letGoAt?: number
+  /** session-sheet override: which side of the new/carried split this topic
+   * shows on. The split is guessed from createdAt vs the last note's createdAt,
+   * and the guess is wrong when a note is written late — so the sheet lets you
+   * shift a topic by hand. Scoped to one session id: once a newer note exists
+   * the override expires and the guess takes over again. */
+  sheetSection?: 'new' | 'carried'
+  sheetSectionFor?: string
 }
 
 export interface Session extends BaseRec {

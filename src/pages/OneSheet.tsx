@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, alive, stillOpen, todayStr, type PrepItem } from '../db'
+import { db, alive, patch, stillOpen, todayStr, type PrepItem } from '../db'
 
 // The sheet you hand her at the start of a session, in her reading order:
 // last time → new since → carried over → the week in feelings → practices.
@@ -53,9 +53,25 @@ export default function OneSheet() {
   // With no session note yet there is no "last time" to split against — the
   // whole queue is the agenda. (The 7-day boundary above only scopes journal
   // and practice-log activity, never which topics make the sheet.)
+  // The split itself is a guess (created before vs after the last note was
+  // started), overridable per topic; an override is scoped to that note's id,
+  // so it lapses on its own once a newer session note exists.
   const byAge = (a: PrepItem, b: PrepItem) => a.createdAt - b.createdAt
-  const fresh = (last ? tops.filter((t) => t.createdAt > last.createdAt) : tops).sort(byAge)
-  const carried = last ? tops.filter((t) => t.createdAt <= last.createdAt).sort(byAge) : []
+  const sectionOf = (t: PrepItem): 'new' | 'carried' => {
+    if (!last) return 'new'
+    if (t.sheetSection && t.sheetSectionFor === last.id) return t.sheetSection
+    return t.createdAt > last.createdAt ? 'new' : 'carried'
+  }
+  const fresh = tops.filter((t) => sectionOf(t) === 'new').sort(byAge)
+  const carried = tops.filter((t) => sectionOf(t) === 'carried').sort(byAge)
+
+  const shift = (t: PrepItem) => {
+    if (!last) return
+    void patch(db.prepItems, t.id, {
+      sheetSection: sectionOf(t) === 'new' ? 'carried' : 'new',
+      sheetSectionFor: last.id,
+    })
+  }
 
   const tally = new Map<string, number>()
   for (const j of journal) for (const w of j.words) tally.set(w, (tally.get(w) ?? 0) + 1)
@@ -77,6 +93,19 @@ export default function OneSheet() {
         <p className="sheet-body">
           · {t.text}
           {t.bucket && <span className="sheet-tag"> ⌗{t.bucket}</span>}
+          {last && (
+            <button
+              className="btn-small btn-ghost sheet-move no-print"
+              onClick={() => shift(t)}
+              title={
+                sectionOf(t) === 'new'
+                  ? 'move to "didn\'t get to last time"'
+                  : 'move to "new since last session"'
+              }
+            >
+              {sectionOf(t) === 'new' ? '⇣ didn\'t get to' : '⇡ new'}
+            </button>
+          )}
         </p>
         {kidsOf(t.id).map((c) => (
           <p key={c.id} className="sheet-sub">
