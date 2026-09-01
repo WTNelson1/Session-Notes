@@ -56,14 +56,16 @@ export default function OneSheet() {
   // The split itself is a guess (created before vs after the last note was
   // started), overridable per topic; an override is scoped to that note's id,
   // so it lapses on its own once a newer session note exists.
-  const byAge = (a: PrepItem, b: PrepItem) => a.createdAt - b.createdAt
+  // Manual order beats age; the two keys share a scale (see db.ts).
+  const sortKey = (t: PrepItem) => t.sheetOrder ?? t.createdAt
+  const byKey = (a: PrepItem, b: PrepItem) => sortKey(a) - sortKey(b)
   const sectionOf = (t: PrepItem): 'new' | 'carried' => {
     if (!last) return 'new'
     if (t.sheetSection && t.sheetSectionFor === last.id) return t.sheetSection
     return t.createdAt > last.createdAt ? 'new' : 'carried'
   }
-  const fresh = tops.filter((t) => sectionOf(t) === 'new').sort(byAge)
-  const carried = tops.filter((t) => sectionOf(t) === 'carried').sort(byAge)
+  const fresh = tops.filter((t) => sectionOf(t) === 'new').sort(byKey)
+  const carried = tops.filter((t) => sectionOf(t) === 'carried').sort(byKey)
 
   const shift = (t: PrepItem) => {
     if (!last) return
@@ -71,6 +73,19 @@ export default function OneSheet() {
       sheetSection: sectionOf(t) === 'new' ? 'carried' : 'new',
       sheetSectionFor: last.id,
     })
+  }
+
+  /** Nudge within a section: swap sort keys with the neighbour. Two writes,
+   * nothing else in the list moves. */
+  const nudge = (list: PrepItem[], i: number, dir: -1 | 1) => {
+    const a = list[i]
+    const b = list[i + dir]
+    if (!a || !b) return
+    let ka = sortKey(a)
+    let kb = sortKey(b)
+    if (ka === kb) kb += dir // same instant (bulk import) — force the swap to hold
+    void patch(db.prepItems, a.id, { sheetOrder: kb })
+    void patch(db.prepItems, b.id, { sheetOrder: ka })
   }
 
   const tally = new Map<string, number>()
@@ -88,11 +103,33 @@ export default function OneSheet() {
     !last && fresh.length === 0 && carried.length === 0 && journal.length === 0 && focus.length === 0
 
   const topicLines = (items: PrepItem[]) =>
-    items.map((t) => (
+    items.map((t, i) => (
       <div key={t.id}>
         <p className="sheet-body">
           · {t.text}
           {t.bucket && <span className="sheet-tag"> ⌗{t.bucket}</span>}
+          {items.length > 1 && (
+            <span className="no-print">
+              <button
+                className="btn-small btn-ghost sheet-move"
+                onClick={() => nudge(items, i, -1)}
+                disabled={i === 0}
+                aria-label="Move up"
+                title="move up"
+              >
+                ↑
+              </button>
+              <button
+                className="btn-small btn-ghost sheet-move"
+                onClick={() => nudge(items, i, 1)}
+                disabled={i === items.length - 1}
+                aria-label="Move down"
+                title="move down"
+              >
+                ↓
+              </button>
+            </span>
+          )}
           {last && (
             <button
               className="btn-small btn-ghost sheet-move no-print"

@@ -519,3 +519,6 @@ details.help p, details.help ol {
   vertical-align: 1px;
   opacity: 0.75;
 }
+
+.sheet-move:disabled { opacity: 0.25; cursor: default; }
+.sheet-move + .sheet-move { margin-left: 2px; }

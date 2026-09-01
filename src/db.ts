@@ -25,6 +25,11 @@ export interface PrepItem extends BaseRec {
    * the override expires and the guess takes over again. */
   sheetSection?: 'new' | 'carried'
   sheetSectionFor?: string
+  /** session-sheet manual sort key. Unset means "sort by createdAt" (the two
+   * share a scale — this starts life as a neighbour's createdAt and diverges
+   * from there via swaps). Deliberately not session-scoped: an ordering
+   * preference goes stale at worst, never wrong, so it is left standing. */
+  sheetOrder?: number
 }
 
 export interface Session extends BaseRec {
