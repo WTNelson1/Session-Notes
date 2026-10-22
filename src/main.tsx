@@ -20,6 +20,12 @@ initBackground({
   nodeAlphaScroll: 0.35,
 })
 
+// Ask the browser to mark this origin's storage persistent. Safari evicts a
+// site's entire IndexedDB + localStorage after 7 days unvisited (ITP) — which
+// is how an idle device comes back blank. Granted silently where the browser
+// allows it; where it isn't, the encrypted gist remains the durable copy.
+void navigator.storage?.persist?.()
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <HashRouter>
