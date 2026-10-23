@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, alive, newRec, softDelete } from '../db'
 import { PRESETS, buildContext, runInsight } from '../ai'
 import { getSetting } from '../settings'
+import Markdown from '../components/Markdown'
 import { useDraft } from '../autosave'
 
 const RANGES = [
@@ -121,7 +122,7 @@ export default function Insights() {
           </div>
           {error && <p className="error-text">{error}</p>}
           <div ref={outputRef} className="insight-output" style={{ marginTop: 10 }}>
-            {output}
+            <Markdown text={output} />
           </div>
           {!running && output && (
             <div className="row" style={{ marginTop: 12 }}>
@@ -145,7 +146,7 @@ export default function Insights() {
                 {ins.title} — {new Date(ins.createdAt).toLocaleDateString()}
               </summary>
               <div className="insight-output small" style={{ marginTop: 8 }}>
-                {ins.content}
+                <Markdown text={ins.content} />
               </div>
               <button
                 className="btn-small btn-ghost"

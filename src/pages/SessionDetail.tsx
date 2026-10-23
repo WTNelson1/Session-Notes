@@ -10,6 +10,7 @@ import OutlineEditor, {
 import { summarizeSession, reviewSession, textHash, REVIEW_MIN_CHARS } from '../ai'
 import { getSetting } from '../settings'
 import { useAutosave } from '../autosave'
+import Markdown from '../components/Markdown'
 
 /** what a note looks like on disk — autosave compares these, not object identity */
 const sig = (date: string, notes: string, takeaways: string) =>
@@ -253,7 +254,7 @@ export default function SessionDetail() {
           </div>
           {review && (
             <div className="insight-output" style={{ marginTop: 10 }}>
-              {review}
+              <Markdown text={review} />
             </div>
           )}
         </div>

@@ -234,13 +234,56 @@ html {
 .preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .preset-grid button { padding: 10px 12px; text-align: left; }
 .insight-output {
-  white-space: pre-wrap;
   line-height: 1.6;
   font-size: 14px;
   font-family: var(--sans);
   color: var(--text);
   overflow-wrap: break-word;
 }
+/* AI output arrives as markdown and renders through <Markdown>. Headings take
+   the app's micro-label voice so the model's structure reads as chrome, not
+   as shouting; bullets get the brass. */
+.insight-output > :first-child { margin-top: 0; }
+.insight-output p { margin: 7px 0; }
+.insight-output h1 {
+  font-size: 15.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 16px 0 4px;
+}
+.insight-output h2,
+.insight-output h3 {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--text-mute);
+  margin: 16px 0 2px;
+}
+.insight-output h3 { font-size: 9.5px; color: var(--text-mute); opacity: 0.8; }
+.insight-output ul,
+.insight-output ol {
+  margin: 6px 0;
+  padding-left: 20px;
+}
+.insight-output li { margin: 4px 0; }
+.insight-output li::marker {
+  color: var(--accent-soft);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.insight-output strong { font-weight: 600; color: var(--text); }
+.insight-output em { color: var(--text-dim); }
+.insight-output code {
+  font-family: var(--mono);
+  font-size: 0.88em;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--line-soft);
+  border-radius: 4px;
+  padding: 0 4px;
+}
+.insight-output.small { font-size: 13px; }
 .error-text { color: var(--danger); font-family: var(--mono); font-size: 12px; }
 
 .session-item { display: block; text-decoration: none; color: inherit; transition: border-color 0.15s; }
