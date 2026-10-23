@@ -12,8 +12,23 @@ const API = 'https://api.github.com'
 interface SyncedSettings {
   apiKey: string
   aboutMe?: string
+  /** apiKey's LWW stamp. In blobs written before the stamps were split, this
+   * was the shared stamp for both fields — the fallbacks below honour that. */
   updatedAt: number
+  /** aboutMe's own LWW stamp; absent in pre-split blobs */
+  aboutMeUpdatedAt?: number
 }
+
+/** aboutMe's stamp on this device. Pre-split devices stamped both fields with
+ * apiKeyUpdatedAt, so a non-empty aboutMe without its own stamp inherits that;
+ * an EMPTY one must not, or a freshly pasted key would shield the emptiness. */
+function localAboutMeStamp(): number {
+  const own = Number(getSetting('aboutMeUpdatedAt') || 0)
+  if (own) return own
+  return getSetting('aboutMe') ? Number(getSetting('apiKeyUpdatedAt') || 0) : 0
+}
+
+const aboutStampOf = (s: SyncedSettings) => s.aboutMeUpdatedAt ?? s.updatedAt
 
 type Snapshot = Record<TableName, BaseRec[]> & { _settings?: SyncedSettings }
 
@@ -35,6 +50,7 @@ export async function localSnapshot(includeSettings = false): Promise<Snapshot> 
       apiKey: getSetting('apiKey'),
       aboutMe: getSetting('aboutMe'),
       updatedAt: Number(getSetting('apiKeyUpdatedAt') || 0),
+      aboutMeUpdatedAt: localAboutMeStamp(),
     }
   }
   return out
@@ -53,17 +69,34 @@ export function mergeSnapshots(a: Snapshot, b: Snapshot): Snapshot {
   }
   const sa = a._settings
   const sb = b._settings
-  out._settings = !sb ? sa : !sa ? sb : sb.updatedAt > sa.updatedAt ? sb : sa
+  // Field-wise, not whole-object: the key and the about-you text each follow
+  // their own stamp, so neither edit can carry the other field along.
+  if (!sb) out._settings = sa
+  else if (!sa) out._settings = sb
+  else {
+    const key = sb.updatedAt > sa.updatedAt ? sb : sa
+    const about = aboutStampOf(sb) > aboutStampOf(sa) ? sb : sa
+    out._settings = {
+      apiKey: key.apiKey,
+      updatedAt: key.updatedAt,
+      aboutMe: about.aboutMe,
+      aboutMeUpdatedAt: aboutStampOf(about),
+    }
+  }
   return out
 }
 
 function applySyncedSettings(s?: SyncedSettings) {
   if (!s) return
-  const localStamp = Number(getSetting('apiKeyUpdatedAt') || 0)
-  if (s.updatedAt > localStamp) {
+  // Per field: setSetting bumps the field's stamp to now, so each write is
+  // followed by pinning the stamp back to the remote value it represents.
+  if (s.updatedAt > Number(getSetting('apiKeyUpdatedAt') || 0)) {
     setSetting('apiKey', s.apiKey)
-    setSetting('aboutMe', s.aboutMe ?? '')
     setSetting('apiKeyUpdatedAt', String(s.updatedAt))
+  }
+  if (aboutStampOf(s) > localAboutMeStamp()) {
+    setSetting('aboutMe', s.aboutMe ?? '')
+    setSetting('aboutMeUpdatedAt', String(aboutStampOf(s)))
   }
 }
 
