@@ -1,11 +1,18 @@
 import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, alive, newRec, softDelete } from '../db'
+import { db, alive, newRec, patch, softDelete } from '../db'
 import { PRESETS, buildContext, runInsight } from '../ai'
 import { getSetting } from '../settings'
 import Markdown from '../components/Markdown'
+import EditableText from '../components/EditableText'
 import { useDraft } from '../autosave'
+
+/** a custom question is its own best name — clipped to stay a summary line */
+function titleFrom(q: string): string {
+  const t = q.trim().replace(/\s+/g, ' ')
+  return t.length > 60 ? t.slice(0, 60).trimEnd() + '…' : t
+}
 
 const RANGES = [
   { label: 'Last 30 days', days: 30 },
@@ -96,7 +103,7 @@ export default function Insights() {
           style={{ marginTop: 10 }}
           onSubmit={(e) => {
             e.preventDefault()
-            if (custom.trim()) void run('Custom question', custom.trim())
+            if (custom.trim()) void run(titleFrom(custom), custom.trim())
           }}
         >
           <input
@@ -117,7 +124,9 @@ export default function Insights() {
       {(running || output || error) && (
         <div className="card">
           <div className="row-between">
-            <h2 style={{ marginBottom: 0 }}>{activeTitle || 'Result'}</h2>
+            <h2 style={{ marginBottom: 0 }}>
+              <EditableText value={activeTitle || 'Result'} onSave={setActiveTitle} />
+            </h2>
             {running && <span className="muted small" style={{ color: 'var(--accent)' }}>✦ thinking…</span>}
           </div>
           {error && <p className="error-text">{error}</p>}
@@ -143,7 +152,15 @@ export default function Insights() {
           {history.map((ins) => (
             <details key={ins.id} className="help" style={{ marginBottom: 8 }}>
               <summary>
-                {ins.title} — {new Date(ins.createdAt).toLocaleDateString()}
+                {/* preventDefault keeps a title tap from toggling the disclosure —
+                    renaming and opening are different intents on one line */}
+                <span onClick={(e) => e.preventDefault()}>
+                  <EditableText
+                    value={ins.title}
+                    onSave={(next) => patch(db.insights, ins.id, { title: next })}
+                  />
+                </span>{' '}
+                — {new Date(ins.createdAt).toLocaleDateString()}
               </summary>
               <div className="insight-output small" style={{ marginTop: 8 }}>
                 <Markdown text={ins.content} />
