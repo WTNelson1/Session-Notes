@@ -238,7 +238,7 @@ export default function Settings() {
         <SettingInput
           settingKey="aboutMe"
           label="about you (shared with the ai)"
-          placeholder="e.g. I'm a man (he/him). My therapist is Dr. K. People who come up often: …"
+          placeholder="e.g. My pronouns are …. My therapist is …. People who come up often: …"
           multiline
         />
         <p className="muted small">

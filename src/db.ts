@@ -10,7 +10,7 @@ export interface BaseRec {
 
 export interface PrepItem extends BaseRec {
   text: string
-  /** which therapy room this topic is for ('ann', 'integration', 'group', …).
+  /** which therapy room this topic is for ('therapy', 'integration', 'group', …).
    * Tracks work like buckets: free lowercase tags, no registry. Only set on
    * top-level topics — sub-items follow their parent. Absent means the
    * original room (see DEFAULT_TRACK). */
@@ -19,7 +19,7 @@ export interface PrepItem extends BaseRec {
   doneAt?: number
   /** set on sub-items: the id of the parent topic */
   parentId?: string
-  /** optional user-named group for top-level topics (e.g. "work", "vic") */
+  /** optional user-named group for top-level topics (e.g. "work", "family") */
   bucket?: string
   /** "the moment passed" — retired without being discussed; kept, restorable */
   letGoAt?: number
