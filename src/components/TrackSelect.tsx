@@ -1,8 +1,9 @@
 import { useState } from 'react'
 
-// Picks which therapy room something belongs to. Tracks are free lowercase
-// tags, like buckets: the list is whatever exists in the data, and "new
-// track…" grows it inline — no registry, no settings page.
+// Picks which therapy room something belongs to: every room as a one-tap chip,
+// current one lit. Tracks are free lowercase tags like buckets — ＋ grows the
+// list inline, no registry, no settings page. A <select> made this a
+// three-step trip; with two or three rooms, one tap is the right cost.
 export default function TrackSelect({
   value,
   tracks,
@@ -47,21 +48,28 @@ export default function TrackSelect({
 
   const options = [...new Set([value, ...tracks])].sort()
   return (
-    <select
-      className="dump-bucket track-select"
-      value={value}
-      aria-label={ariaLabel}
-      onChange={(e) => {
-        if (e.target.value === '\u0000new') setAdding(true)
-        else onChange(e.target.value)
-      }}
-    >
+    <span className="track-chips" role="radiogroup" aria-label={ariaLabel}>
       {options.map((t) => (
-        <option key={t} value={t}>
+        <button
+          key={t}
+          type="button"
+          role="radio"
+          aria-checked={t === value}
+          className={`btn-small ${t === value ? 'btn-primary' : 'btn-ghost'}`}
+          onClick={() => onChange(t)}
+        >
           {t}
-        </option>
+        </button>
       ))}
-      <option value={'\u0000new'}>＋ new track…</option>
-    </select>
+      <button
+        type="button"
+        className="btn-small btn-ghost"
+        onClick={() => setAdding(true)}
+        aria-label="New track"
+        title="new track"
+      >
+        ＋
+      </button>
+    </span>
   )
 }

@@ -574,7 +574,12 @@ details.help p, details.help ol {
   color: var(--text-dim);
   margin-top: 18px;
 }
-.track-select { max-width: 160px; }
+.track-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
 .track-new { max-width: 160px; padding: 6px 10px; font-size: 13px; }
-.session-meta { align-items: flex-end; }
+.session-meta { align-items: flex-end; flex-wrap: wrap; }
 .session-meta .field { margin-bottom: 0; }

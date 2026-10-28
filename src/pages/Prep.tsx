@@ -462,13 +462,16 @@ export default function Prep() {
             value={text}
             onChange={(e) => setText(e.target.value)}
           />
-          {knownTracks.length > 1 && (
-            <TrackSelect value={track} tracks={knownTracks} onChange={setTrack} />
-          )}
           <button type="submit" className="btn-primary">
             Add
           </button>
         </form>
+
+        {knownTracks.length > 1 && (
+          <div style={{ marginTop: 8 }}>
+            <TrackSelect value={track} tracks={knownTracks} onChange={setTrack} />
+          </div>
+        )}
 
         <div className="row">
           <BrainDump buckets={buckets} track={track} />
