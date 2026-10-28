@@ -118,12 +118,10 @@ html {
 
 /* ---------- feelings wheel ---------- */
 .wheel-wrap { max-width: 400px; margin: 0 auto; position: relative; }
-.wheel-search-btn {
-  position: absolute;
-  top: 0;
-  right: 0;
-  font-size: 15px;
-  z-index: 1;
+.wheel-search-input {
+  font-family: var(--mono);
+  font-size: 12px;
+  margin-bottom: 10px;
 }
 .feel-search-results {
   display: flex;

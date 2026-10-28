@@ -104,12 +104,15 @@ function FeelingSearch({
   selected,
   onToggle,
   onClose,
+  initial = '',
 }: {
   selected: string[]
   onToggle: (word: string) => void
   onClose: () => void
+  /** what was typed before this view mounted — search continues mid-word */
+  initial?: string
 }) {
-  const [q, setQ] = useState('')
+  const [q, setQ] = useState(initial)
   const [cursor, setCursor] = useState(0)
   const ref = useRef<HTMLInputElement>(null)
   const results = searchFeelings(q)
@@ -195,11 +198,38 @@ export default function FeelingsWheel({
 }) {
   const [focused, setFocused] = useState<CoreFamily | null>(null)
   const [searching, setSearching] = useState(false)
+  const [seed, setSeed] = useState('')
   const isSel = (w: string) => selected.includes(w)
+
+  // Desktop: just start typing while the wheel is up and the search opens with
+  // that letter — no tap first. Only when nothing else owns the keyboard: the
+  // journal textarea sits on the same page and must never be hijacked.
+  useEffect(() => {
+    if (searching) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      if (e.key.length !== 1 || e.key === ' ') return
+      const ae = document.activeElement
+      if (ae && ae !== document.body && ae.tagName !== 'BUTTON' && ae.tagName !== 'A') return
+      e.preventDefault()
+      setSeed(e.key)
+      setSearching(true)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [searching])
 
   if (searching) {
     return (
-      <FeelingSearch selected={selected} onToggle={onToggle} onClose={() => setSearching(false)} />
+      <FeelingSearch
+        selected={selected}
+        onToggle={onToggle}
+        initial={seed}
+        onClose={() => {
+          setSearching(false)
+          setSeed('')
+        }}
+      />
     )
   }
 
@@ -208,14 +238,22 @@ export default function FeelingsWheel({
     const step = 360 / n
     return (
       <div className="wheel-wrap">
-        <button
-          className="btn-small btn-ghost wheel-search-btn"
-          onClick={() => setSearching(true)}
+        {/* a launcher, not a field: it holds no value — the first character
+            carries into the search view, which takes over mid-word */}
+        <input
+          type="text"
+          className="wheel-search-input"
+          placeholder="⌕ start typing a feeling…"
+          value=""
           aria-label="search feelings"
-          title="search feelings"
-        >
-          ⌕
-        </button>
+          autoCapitalize="off"
+          autoCorrect="off"
+          spellCheck={false}
+          onChange={(e) => {
+            setSeed(e.target.value)
+            setSearching(true)
+          }}
+        />
         <svg viewBox="0 0 360 360">
           {WHEEL.map((core, i) => {
             const start = i * step
