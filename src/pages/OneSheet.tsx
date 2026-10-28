@@ -1,5 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, alive, patch, stillOpen, todayStr, type PrepItem } from '../db'
+import { db, alive, patch, stillOpen, todayStr, trackOf, DEFAULT_TRACK, type PrepItem } from '../db'
+import { useDraft } from '../autosave'
 
 // The sheet you hand her at the start of a session, in her reading order:
 // last time → new since → carried over → the week in feelings → practices.
@@ -20,32 +21,46 @@ function snippet(text: string): string {
 }
 
 export default function OneSheet() {
+  // Which room this sheet is for. Sticky across visits — you print for the
+  // same therapist repeatedly — and switchable from chips at the top.
+  const [chosenTrack, setChosenTrack] = useDraft('anchor.sheetTrack', '')
+
   const data = useLiveQuery(async () => {
     const sessions = (await db.sessions.toArray())
       .filter(alive)
       .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt)
-    // "Last time" is the newest saved note. Its createdAt is the boundary:
-    // topics that existed before you started writing it were on the table that
-    // session; anything newer is this week's material.
-    const last = sessions[0]
-    const boundary = last ? last.createdAt : Date.now() - 7 * DAY
-    const boundaryDate = todayStr(new Date(boundary))
-    const prep = (await db.prepItems.toArray()).filter(alive)
-    const journal = (await db.journal.toArray())
-      .filter(alive)
-      .filter((j) => j.at >= boundary)
-      .sort((a, b) => a.at - b.at)
-    const practices = (await db.practices.toArray()).filter(alive)
-    const logs = (await db.practiceLogs.toArray())
-      .filter(alive)
-      .filter((l) => l.date >= boundaryDate)
-    return { last, prep, journal, practices, logs }
+    return {
+      sessions,
+      prep: (await db.prepItems.toArray()).filter(alive),
+      practices: (await db.practices.toArray()).filter(alive),
+      logs: (await db.practiceLogs.toArray()).filter(alive),
+      journalAll: (await db.journal.toArray()).filter(alive),
+    }
   })
 
   if (!data) return <p className="muted">loading…</p>
-  const { last, prep, journal, practices, logs } = data
+  const { sessions, prep, practices, journalAll } = data
 
-  const tops = prep.filter((p) => !p.parentId && stillOpen(p))
+  const sheetTracks = [
+    ...new Set([
+      ...sessions.map(trackOf),
+      ...prep.filter((p) => !p.parentId && stillOpen(p)).map(trackOf),
+    ]),
+  ].sort()
+  const track = sheetTracks.includes(chosenTrack)
+    ? chosenTrack
+    : (sheetTracks[0] ?? DEFAULT_TRACK)
+
+  // "Last time" is the newest saved note IN THIS ROOM. Its createdAt is the
+  // boundary: topics that existed before you started writing it were on the
+  // table that session; anything newer is this week's material.
+  const last = sessions.filter((x) => trackOf(x) === track)[0]
+    const boundary = last ? last.createdAt : Date.now() - 7 * DAY
+    const boundaryDate = todayStr(new Date(boundary))
+    const journal = journalAll.filter((j) => j.at >= boundary).sort((a, b) => a.at - b.at)
+    const logs = data.logs.filter((l) => l.date >= boundaryDate)
+
+  const tops = prep.filter((p) => !p.parentId && stillOpen(p) && trackOf(p) === track)
   const kidsOf = (id: string) =>
     prep
       .filter((p) => p.parentId === id && !p.done)
@@ -156,8 +171,25 @@ export default function OneSheet() {
     <div className="card onesheet">
       <div className="row-between">
         <span className="onesheet-title">anchor · session sheet</span>
-        <span className="sheet-tag">{todayStr()}</span>
+        <span className="sheet-tag">
+          {sheetTracks.length > 1 ? `${track} · ` : ''}
+          {todayStr()}
+        </span>
       </div>
+
+      {sheetTracks.length > 1 && (
+        <div className="row no-print" style={{ gap: 6, marginTop: 8 }}>
+          {sheetTracks.map((t) => (
+            <button
+              key={t}
+              className={`btn-small ${t === track ? 'btn-primary' : 'btn-ghost'}`}
+              onClick={() => setChosenTrack(t)}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      )}
 
       {last && (last.summary || last.takeaways.trim() || last.notes.trim()) && (
         <section>

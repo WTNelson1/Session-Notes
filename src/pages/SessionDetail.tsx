@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, alive, newRec, patch, softDelete, stillOpen, todayStr, type PrepItem } from '../db'
+import { db, alive, newRec, patch, softDelete, stillOpen, todayStr, trackOf, DEFAULT_TRACK, type PrepItem } from '../db'
 import OutlineEditor, {
   parseOutline,
   serializeOutline,
@@ -11,10 +11,20 @@ import { summarizeSession, reviewSession, textHash, REVIEW_MIN_CHARS } from '../
 import { getSetting } from '../settings'
 import { useAutosave } from '../autosave'
 import Markdown from '../components/Markdown'
+import TrackSelect from '../components/TrackSelect'
 
 /** what a note looks like on disk — autosave compares these, not object identity */
-const sig = (date: string, notes: string, takeaways: string) =>
-  `${date}\u0000${notes}\u0000${takeaways}`
+const sig = (date: string, notes: string, takeaways: string, track: string) =>
+  `${date}\u0000${notes}\u0000${takeaways}\u0000${track}`
+
+/** the room a NEW note defaults to: wherever the last note was filed */
+function lastUsedTrack(): string {
+  try {
+    return localStorage.getItem('anchor.lastTrack') || DEFAULT_TRACK
+  } catch {
+    return DEFAULT_TRACK
+  }
+}
 
 export default function SessionDetail() {
   const { id } = useParams()
@@ -23,6 +33,7 @@ export default function SessionDetail() {
 
   const [sessionId, setSessionId] = useState<string | null>(isNew ? null : (id ?? null))
   const [date, setDate] = useState(todayStr())
+  const [track, setTrack] = useState(lastUsedTrack)
   const [outline, setOutline] = useState<OutlineLine[]>(() => parseOutline(''))
   const [takeaways, setTakeaways] = useState('')
   const [practiceText, setPracticeText] = useState('')
@@ -40,13 +51,14 @@ export default function SessionDetail() {
     void db.sessions.get(id).then((s) => {
       if (s) {
         setDate(s.date)
+        setTrack(trackOf(s))
         setOutline(parseOutline(s.notes))
         setTakeaways(s.takeaways)
         setSummary(s.summary ?? '')
         setReview(s.review ?? '')
         // what is already on disk, round-tripped the way autosave will write it,
         // so merely opening a note never schedules a pointless rewrite
-        markSaved(sig(s.date, serializeOutline(parseOutline(s.notes)), s.takeaways))
+        markSaved(sig(s.date, serializeOutline(parseOutline(s.notes)), s.takeaways, trackOf(s)))
         // reviews auto-run for substantial notes and cache by content hash
         void maybeReview(s.id)
       }
@@ -56,8 +68,15 @@ export default function SessionDetail() {
   }, [id, isNew])
 
   const prepItems = useLiveQuery(async () => (await db.prepItems.toArray()).filter(alive))
+  const allSessions = useLiveQuery(async () => (await db.sessions.toArray()).filter(alive))
+  const knownTracks = [
+    ...new Set([
+      ...(allSessions ?? []).map(trackOf),
+      ...(prepItems ?? []).filter((p) => !p.parentId).map(trackOf),
+    ]),
+  ]
   const openTops = (prepItems ?? [])
-    .filter((p) => !p.parentId && stillOpen(p))
+    .filter((p) => !p.parentId && stillOpen(p) && trackOf(p) === track)
     .sort((a, b) => b.createdAt - a.createdAt)
   const childrenOf = (pid: string) =>
     (prepItems ?? []).filter((p) => p.parentId === pid).sort((a, b) => a.createdAt - b.createdAt)
@@ -72,11 +91,16 @@ export default function SessionDetail() {
 
   async function save(): Promise<string> {
     const notes = serializeOutline(outline)
+    try {
+      localStorage.setItem('anchor.lastTrack', track)
+    } catch {
+      // fine — the default just stays wherever it was
+    }
     if (sessionId) {
-      await patch(db.sessions, sessionId, { date, notes, takeaways })
+      await patch(db.sessions, sessionId, { date, track, notes, takeaways })
       return sessionId
     }
-    const rec = { ...newRec(), date, notes, takeaways }
+    const rec = { ...newRec(), date, track, notes, takeaways }
     await db.sessions.add(rec)
     setSessionId(rec.id)
     return rec.id
@@ -96,7 +120,7 @@ export default function SessionDetail() {
   const notes = serializeOutline(outline)
   const { state: autoState, markSaved } = useAutosave({
     ready: loaded,
-    signature: sig(date, notes, takeaways),
+    signature: sig(date, notes, takeaways, track),
     // opening the page must not conjure an empty session into the list
     skip: !sessionId && !notes.trim() && !takeaways.trim(),
     save,
@@ -115,6 +139,9 @@ export default function SessionDetail() {
     try {
       const history = (await db.sessions.toArray())
         .filter(alive)
+        // continuity only means something inside the same room — grounding an
+        // integration review in group-therapy notes would mislead it
+        .filter((h) => trackOf(h) === trackOf(s))
         .filter((h) => h.id !== sid && h.notes.trim() && h.date <= s.date)
         .sort((a, b) => b.date.localeCompare(a.date))
         .slice(0, 3)
@@ -182,10 +209,16 @@ export default function SessionDetail() {
     <div>
       <div className="card">
         {summary && <p className="session-summary">✦ {summary}</p>}
-        <label className="field">
-          <span className="label-text">Session date</span>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-        </label>
+        <div className="row session-meta">
+          <label className="field" style={{ flex: 1 }}>
+            <span className="label-text">Session date</span>
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </label>
+          <label className="field">
+            <span className="label-text">Track</span>
+            <TrackSelect value={track} tracks={knownTracks} onChange={setTrack} />
+          </label>
+        </div>
         <div className="field">
           <span className="label-text">
             What came up <span className="hint">(Tab / ⇥ to nest bullets)</span>

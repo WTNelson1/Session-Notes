@@ -10,6 +10,11 @@ export interface BaseRec {
 
 export interface PrepItem extends BaseRec {
   text: string
+  /** which therapy room this topic is for ('ann', 'integration', 'group', …).
+   * Tracks work like buckets: free lowercase tags, no registry. Only set on
+   * top-level topics — sub-items follow their parent. Absent means the
+   * original room (see DEFAULT_TRACK). */
+  track?: string
   done: 0 | 1
   doneAt?: number
   /** set on sub-items: the id of the parent topic */
@@ -34,6 +39,8 @@ export interface PrepItem extends BaseRec {
 
 export interface Session extends BaseRec {
   date: string // YYYY-MM-DD
+  /** which therapy room this session happened in — see PrepItem.track */
+  track?: string
   notes: string
   takeaways: string
   /** ✦ 1-2 sentence AI summary shown as the list preview */
@@ -120,6 +127,39 @@ export function newRec(): BaseRec {
 
 export function alive<T extends BaseRec>(r: T): boolean {
   return !r.deleted
+}
+
+/** The room everything predating tracks belongs to: the original therapist.
+ * Also the fallback whenever a record arrives without one (an old build's
+ * edit, an un-run backfill), so untagged never means a fourth phantom room. */
+export const DEFAULT_TRACK = 'ann'
+
+export function trackOf(r: { track?: string }): string {
+  return r.track || DEFAULT_TRACK
+}
+
+/** One-time per device: stamp pre-track sessions and topics explicitly, so the
+ * tag rides sync instead of living only in trackOf()'s fallback. Idempotent —
+ * a device that pulls already-stamped records stamps nothing. */
+export async function backfillTracks() {
+  try {
+    if (localStorage.getItem('anchor.tracksBackfilled')) return
+  } catch {
+    return
+  }
+  const now = Date.now()
+  await db.transaction('rw', db.sessions, db.prepItems, async () => {
+    for (const s of await db.sessions.toArray())
+      if (!s.deleted && !s.track) await db.sessions.update(s.id, { track: DEFAULT_TRACK, updatedAt: now })
+    for (const t of await db.prepItems.toArray())
+      if (!t.deleted && !t.parentId && !t.track)
+        await db.prepItems.update(t.id, { track: DEFAULT_TRACK, updatedAt: now })
+  })
+  try {
+    localStorage.setItem('anchor.tracksBackfilled', '1')
+  } catch {
+    // storage unavailable — it will simply run again next launch, harmlessly
+  }
 }
 
 /**

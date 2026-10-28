@@ -565,3 +565,15 @@ details.help p, details.help ol {
 
 .sheet-move:disabled { opacity: 0.25; cursor: default; }
 .sheet-move + .sheet-move { margin-left: 2px; }
+
+/* ---------- tracks (which therapy room) ---------- */
+.track-header {
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  color: var(--text-dim);
+  margin-top: 18px;
+}
+.track-select { max-width: 160px; }
+.track-new { max-width: 160px; padding: 6px 10px; font-size: 13px; }
+.session-meta { align-items: flex-end; }
+.session-meta .field { margin-bottom: 0; }

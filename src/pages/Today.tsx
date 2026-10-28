@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, alive, newRec, softDelete, todayStr, stillOpen } from '../db'
+import { db, alive, newRec, softDelete, todayStr, stillOpen, trackOf } from '../db'
 import FeelingChips from '../components/FeelingChips'
 import FeelingsWheel from '../components/FeelingsWheel'
 
@@ -19,6 +19,7 @@ export default function Today() {
       // order (UUID keys, i.e. shuffled), so a fresh jot could land anywhere
       .sort((a, b) => b.createdAt - a.createdAt),
   )
+  const manyTracks = new Set((openPrep ?? []).map(trackOf)).size > 1
   const practices = useLiveQuery(async () =>
     (await db.practices.where('active').equals(1).toArray()).filter(alive),
   )
@@ -165,6 +166,7 @@ export default function Today() {
           <div style={{ marginTop: 4 }}>
             {openPrep.slice(0, 4).map((p) => (
               <div key={p.id} className="check-item">
+                {manyTracks && <span className="feel-search-via" style={{ marginLeft: 0 }}>◆ {trackOf(p)}</span>}
                 <span className="text">{p.text}</span>
               </div>
             ))}

@@ -6,6 +6,7 @@ import '@fontsource/geist-sans/500.css'
 import '@fontsource/geist-mono/400.css'
 import '@fontsource/geist-mono/500.css'
 import { initBackground } from '@personal-os/kit'
+import { backfillTracks } from './db'
 import App from './App'
 import './index.css'
 
@@ -25,6 +26,9 @@ initBackground({
 // is how an idle device comes back blank. Granted silently where the browser
 // allows it; where it isn't, the encrypted gist remains the durable copy.
 void navigator.storage?.persist?.()
+
+// stamp pre-track data with the original room (one-time per device, idempotent)
+void backfillTracks()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

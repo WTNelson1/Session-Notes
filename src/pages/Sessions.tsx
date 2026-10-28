@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, alive, patch } from '../db'
+import { db, alive, patch, trackOf } from '../db'
 import { summarizeSession, textHash } from '../ai'
 import { getSetting } from '../settings'
 
@@ -15,6 +15,7 @@ export default function Sessions() {
   )
 
   const apiKey = getSetting('apiKey')
+  const manyTracks = new Set((sessions ?? []).map(trackOf)).size > 1
   const summarizable = sessions?.filter((s) => s.notes.trim()) ?? []
   const unsummarized = summarizable.filter((s) => !s.summary)
 
@@ -67,6 +68,7 @@ export default function Sessions() {
               month: 'short',
               day: 'numeric',
             })}
+            {manyTracks && <span className="feel-search-via">◆ {trackOf(s)}</span>}
           </strong>
           <p className={`preview ${s.summary ? 'full' : ''}`} style={{ margin: '6px 0 0' }}>
             {s.summary ? `✦ ${s.summary}` : s.notes.replace(/^\s*-\s?/gm, '') || 'no notes'}

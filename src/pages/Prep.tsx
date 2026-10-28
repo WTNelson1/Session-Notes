@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, alive, newRec, patch, softDelete, stillOpen, type PrepItem } from '../db'
+import { db, alive, newRec, patch, softDelete, stillOpen, trackOf, DEFAULT_TRACK, type PrepItem } from '../db'
 import EditableText from '../components/EditableText'
 import { bulletsFromDump, type DumpTopic } from '../ai'
 import { getSetting } from '../settings'
 import { useDraft } from '../autosave'
+import TrackSelect from '../components/TrackSelect'
 
 function SubItemInput({ parentId }: { parentId: string }) {
   const [text, setText] = useState('')
@@ -40,10 +41,12 @@ function SubItemInput({ parentId }: { parentId: string }) {
 function BucketPicker({
   item,
   buckets,
+  tracks,
   onClose,
 }: {
   item: PrepItem
   buckets: string[]
+  tracks: string[]
   onClose: () => void
 }) {
   const [newName, setNewName] = useState('')
@@ -55,6 +58,23 @@ function BucketPicker({
 
   return (
     <div className="bucket-picker">
+      {tracks.length > 1 && (
+        <span className="row" style={{ gap: 6 }}>
+          <span className="sheet-tag">room:</span>
+          {tracks.map((t) => (
+            <button
+              key={t}
+              className={`btn-small ${trackOf(item) === t ? 'btn-primary' : ''}`}
+              onClick={() => {
+                void patch(db.prepItems, item.id, { track: t })
+                onClose()
+              }}
+            >
+              {t}
+            </button>
+          ))}
+        </span>
+      )}
       {buckets.map((b) => (
         <button
           key={b}
@@ -95,7 +115,7 @@ const DUMP_KEY = 'anchor.dump'
 const DRAFT_KEY = 'anchor.dumpDraft'
 
 /** Messy in, reviewable topics out. Nothing reaches the queue until you say so. */
-function BrainDump({ buckets }: { buckets: string[] }) {
+function BrainDump({ buckets, track }: { buckets: string[]; track: string }) {
   const [dump, setDump] = useDraft(DUMP_KEY, '')
   const [draft, setDraft] = useDraft<DumpTopic[] | null>(DRAFT_KEY, null)
   const [open, setOpen] = useState(() => !!dump || !!draft)
@@ -144,6 +164,7 @@ function BrainDump({ buckets }: { buckets: string[] }) {
         ...parent,
         text: t.text,
         done: 0,
+        track,
         bucket: t.bucket || undefined,
       })
       for (let j = 0; j < t.details.length; j++) {
@@ -280,10 +301,12 @@ function BrainDump({ buckets }: { buckets: string[] }) {
 
 export default function Prep() {
   const [text, setText] = useState('')
+  const [track, setTrack] = useDraft('anchor.prepTrack', DEFAULT_TRACK)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [pickingId, setPickingId] = useState<string | null>(null)
 
   const items = useLiveQuery(async () => (await db.prepItems.toArray()).filter(alive))
+  const sessions = useLiveQuery(async () => (await db.sessions.toArray()).filter(alive))
 
   const tops = (items ?? [])
     .filter((i) => !i.parentId)
@@ -300,12 +323,15 @@ export default function Prep() {
     .sort((a, b) => (b.letGoAt ?? 0) - (a.letGoAt ?? 0))
 
   const buckets = [...new Set(open.map((i) => i.bucket).filter(Boolean) as string[])].sort()
-  const inbox = open.filter((i) => !i.bucket)
+  const knownTracks = [
+    ...new Set([...(sessions ?? []).map(trackOf), ...tops.map(trackOf), track]),
+  ].sort()
+  const queueTracks = [...new Set(open.map(trackOf))].sort()
 
   async function add() {
     const t = text.trim()
     if (!t) return
-    await db.prepItems.add({ ...newRec(), text: t, done: 0 })
+    await db.prepItems.add({ ...newRec(), text: t, done: 0, track })
     setText('')
   }
 
@@ -406,7 +432,12 @@ export default function Prep() {
           </button>
         </div>
         {pickingId === i.id && (
-          <BucketPicker item={i} buckets={buckets} onClose={() => setPickingId(null)} />
+          <BucketPicker
+            item={i}
+            buckets={buckets}
+            tracks={knownTracks}
+            onClose={() => setPickingId(null)}
+          />
         )}
         {renderChildren(i)}
         {expandedId === i.id && <SubItemInput parentId={i.id} />}
@@ -431,28 +462,42 @@ export default function Prep() {
             value={text}
             onChange={(e) => setText(e.target.value)}
           />
+          {knownTracks.length > 1 && (
+            <TrackSelect value={track} tracks={knownTracks} onChange={setTrack} />
+          )}
           <button type="submit" className="btn-primary">
             Add
           </button>
         </form>
 
         <div className="row">
-          <BrainDump buckets={buckets} />
+          <BrainDump buckets={buckets} track={track} />
           <Link to="/onesheet" className="btn btn-small btn-ghost dump-toggle" style={{ textDecoration: 'none' }}>
             ⎙ session sheet
           </Link>
         </div>
 
         <div style={{ marginTop: 10 }}>
-          {inbox.map(renderTopic)}
-          {buckets.map((b) => (
-            <div key={b}>
-              <p className="bucket-header">
-                ⌗ {b} · {open.filter((i) => i.bucket === b).length}
-              </p>
-              {open.filter((i) => i.bucket === b).map(renderTopic)}
-            </div>
-          ))}
+          {queueTracks.map((tr) => {
+            const subset = open.filter((i) => trackOf(i) === tr)
+            const subBuckets = [...new Set(subset.map((i) => i.bucket).filter(Boolean) as string[])].sort()
+            return (
+              <div key={tr}>
+                {queueTracks.length > 1 && (
+                  <p className="bucket-header track-header">◆ {tr}</p>
+                )}
+                {subset.filter((i) => !i.bucket).map(renderTopic)}
+                {subBuckets.map((b) => (
+                  <div key={b}>
+                    <p className="bucket-header">
+                      ⌗ {b} · {subset.filter((i) => i.bucket === b).length}
+                    </p>
+                    {subset.filter((i) => i.bucket === b).map(renderTopic)}
+                  </div>
+                ))}
+              </div>
+            )
+          })}
           {open.length === 0 && (
             <p className="muted small">
               nothing queued · add thoughts as they come up — tap text to edit · ＋ nests details

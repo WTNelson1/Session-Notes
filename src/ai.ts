@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { db, alive, stillOpen, todayStr } from './db'
+import { db, alive, stillOpen, todayStr, trackOf } from './db'
 import { getSetting } from './settings'
 
 /** optional user-provided context (pronouns, names, anything) for every AI call */
@@ -85,10 +85,20 @@ export async function buildContext(sinceDays: number | null): Promise<string> {
 
   const parts: string[] = []
 
+  // When notes span several therapy contexts, the model needs to know which
+  // room each one came from — a group session and an individual session are
+  // different kinds of evidence.
+  const manyTracks = new Set(sessions.map(trackOf)).size > 1
+
   if (sessions.length) {
     parts.push('## Therapy session notes')
+    if (manyTracks)
+      parts.push(
+        '(Sessions are labelled with their context: separate therapists/groups, parallel work.)',
+      )
     for (const s of sessions) {
-      parts.push(`### Session ${s.date}\n${s.notes.trim()}`)
+      const label = manyTracks ? ` — with ${trackOf(s)}` : ''
+      parts.push(`### Session ${s.date}${label}\n${s.notes.trim()}`)
       if (s.takeaways.trim()) parts.push(`Takeaways: ${s.takeaways.trim()}`)
     }
   }
@@ -126,9 +136,12 @@ export async function buildContext(sinceDays: number | null): Promise<string> {
 
   const describeTopic = (p: (typeof prep)[number]) => {
     const subs = prep.filter((c) => c.parentId === p.id)
-    return subs.length
-      ? `"${p.text}" (details: ${subs.map((c) => `"${c.text}"`).join('; ')})`
-      : `"${p.text}"`
+    const room = manyTracks ? ` [for ${trackOf(p)}]` : ''
+    return (
+      (subs.length
+        ? `"${p.text}" (details: ${subs.map((c) => `"${c.text}"`).join('; ')})`
+        : `"${p.text}"`) + room
+    )
   }
   const openPrep = prep.filter((p) => !p.parentId && stillOpen(p))
   const coveredPrep = prep.filter((p) => p.done && !p.parentId)
@@ -219,8 +232,8 @@ Grounding rules — these override everything else:
  * plus up to three earlier sessions (for continuity only). */
 export async function reviewSession(
   apiKey: string,
-  session: { date: string; notes: string; takeaways: string },
-  history: { date: string; notes: string; takeaways: string }[],
+  session: { date: string; notes: string; takeaways: string; track?: string },
+  history: { date: string; notes: string; takeaways: string; track?: string }[],
 ): Promise<string> {
   const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true })
   const earlier = history
