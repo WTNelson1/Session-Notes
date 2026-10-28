@@ -323,8 +323,14 @@ export default function Prep() {
     .sort((a, b) => (b.letGoAt ?? 0) - (a.letGoAt ?? 0))
 
   const buckets = [...new Set(open.map((i) => i.bucket).filter(Boolean) as string[])].sort()
+  const roster = useLiveQuery(async () => (await db.tracks.toArray()).filter(alive))
   const knownTracks = [
-    ...new Set([...(sessions ?? []).map(trackOf), ...tops.map(trackOf), track]),
+    ...new Set([
+      ...(roster ?? []).map((t) => t.id),
+      ...(sessions ?? []).map(trackOf),
+      ...tops.map(trackOf),
+      track,
+    ]),
   ].sort()
   const queueTracks = [...new Set(open.map(trackOf))].sort()
 

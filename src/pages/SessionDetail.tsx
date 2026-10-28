@@ -69,8 +69,10 @@ export default function SessionDetail() {
 
   const prepItems = useLiveQuery(async () => (await db.prepItems.toArray()).filter(alive))
   const allSessions = useLiveQuery(async () => (await db.sessions.toArray()).filter(alive))
+  const roster = useLiveQuery(async () => (await db.tracks.toArray()).filter(alive))
   const knownTracks = [
     ...new Set([
+      ...(roster ?? []).map((t) => t.id),
       ...(allSessions ?? []).map(trackOf),
       ...(prepItems ?? []).filter((p) => !p.parentId).map(trackOf),
     ]),

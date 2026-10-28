@@ -35,14 +35,16 @@ export default function OneSheet() {
       practices: (await db.practices.toArray()).filter(alive),
       logs: (await db.practiceLogs.toArray()).filter(alive),
       journalAll: (await db.journal.toArray()).filter(alive),
+      roster: (await db.tracks.toArray()).filter(alive),
     }
   })
 
   if (!data) return <p className="muted">loading…</p>
-  const { sessions, prep, practices, journalAll } = data
+  const { sessions, prep, practices, journalAll, roster } = data
 
   const sheetTracks = [
     ...new Set([
+      ...roster.map((t) => t.id),
       ...sessions.map(trackOf),
       ...prep.filter((p) => !p.parentId && stillOpen(p)).map(trackOf),
     ]),

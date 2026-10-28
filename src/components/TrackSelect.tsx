@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ensureTrack } from '../db'
 
 // Picks which therapy room something belongs to: every room as a one-tap chip,
 // current one lit. Tracks are free lowercase tags like buckets — ＋ grows the
@@ -17,6 +18,11 @@ export default function TrackSelect({
 }) {
   const [adding, setAdding] = useState(false)
   const [name, setName] = useState('')
+  // Tracks created here exist nowhere until a record saves with one — they are
+  // only "the current value". Without this list, making a second new track
+  // silently evaporated the first, which read as data loss. They stay for the
+  // life of this page and become permanent the moment anything saves.
+  const [created, setCreated] = useState<string[]>([])
 
   if (adding) {
     return (
@@ -25,7 +31,11 @@ export default function TrackSelect({
         onSubmit={(e) => {
           e.preventDefault()
           const t = name.trim().toLowerCase()
-          if (t) onChange(t)
+          if (t) {
+            setCreated((c) => (c.includes(t) ? c : [...c, t]))
+            void ensureTrack(t) // into the synced roster — exists before any note does
+            onChange(t)
+          }
           setAdding(false)
           setName('')
         }}
@@ -46,7 +56,7 @@ export default function TrackSelect({
     )
   }
 
-  const options = [...new Set([value, ...tracks])].sort()
+  const options = [...new Set([value, ...created, ...tracks])].sort()
   return (
     <span className="track-chips" role="radiogroup" aria-label={ariaLabel}>
       {options.map((t) => (

@@ -82,6 +82,13 @@ export interface Insight extends BaseRec {
   content: string
 }
 
+/** A therapy room in the roster. The id IS the name. Rooms also exist
+ * implicitly wherever sessions/topics carry their tag — this table only makes
+ * one exist before its first record does (and across devices, since it syncs
+ * as ordinary data; settings taught us not to bolt more fields onto the
+ * settings blob). */
+export interface Track extends BaseRec {}
+
 class AnchorDB extends Dexie {
   prepItems!: Table<PrepItem, string>
   sessions!: Table<Session, string>
@@ -90,6 +97,7 @@ class AnchorDB extends Dexie {
   moods!: Table<Mood, string>
   insights!: Table<Insight, string>
   journal!: Table<JournalEntry, string>
+  tracks!: Table<Track, string>
 
   constructor() {
     super('anchor')
@@ -104,6 +112,9 @@ class AnchorDB extends Dexie {
     this.version(2).stores({
       journal: 'id, at, updatedAt',
     })
+    this.version(3).stores({
+      tracks: 'id, updatedAt',
+    })
   }
 }
 
@@ -117,6 +128,7 @@ export const TABLES = [
   'moods',
   'insights',
   'journal',
+  'tracks',
 ] as const
 export type TableName = (typeof TABLES)[number]
 
@@ -136,6 +148,15 @@ export const DEFAULT_TRACK = 'ann'
 
 export function trackOf(r: { track?: string }): string {
   return r.track || DEFAULT_TRACK
+}
+
+/** Make a room exist by name, now and on every synced device. Idempotent;
+ * reviving a soft-deleted entry is deliberate (re-adding = un-deleting). */
+export async function ensureTrack(name: string) {
+  const now = Date.now()
+  const existing = await db.tracks.get(name)
+  if (existing && !existing.deleted) return
+  await db.tracks.put({ id: name, createdAt: existing?.createdAt ?? now, updatedAt: now })
 }
 
 /** One-time per device: stamp pre-track sessions and topics explicitly, so the

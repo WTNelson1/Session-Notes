@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { db, TABLES, alive, patch } from '../db'
+import { db, TABLES, alive, ensureTrack, patch, softDelete, trackOf } from '../db'
 import { getSetting, setSetting, type SettingKey } from '../settings'
 import { localSnapshot, importData, syncNow } from '../sync'
+import { useLiveQuery } from 'dexie-react-hooks'
 import { summarizeSession, textHash } from '../ai'
 
 function SettingInput({
@@ -87,6 +88,66 @@ function SettingInput({
         </div>
       )}
     </label>
+  )
+}
+
+/** The roster of rooms: add one before its first session exists; × retires it
+ * from the pickers. Rooms whose notes still carry the tag keep appearing in
+ * grouped views regardless — data outranks the roster. */
+function TrackRoster() {
+  const [name, setName] = useState('')
+  const roster = useLiveQuery(async () => (await db.tracks.toArray()).filter(alive))
+  const sessions = useLiveQuery(async () => (await db.sessions.toArray()).filter(alive))
+  const inUse = new Set((sessions ?? []).map(trackOf))
+
+  return (
+    <>
+      <div className="chip-row" style={{ marginTop: 0 }}>
+        {(roster ?? []).map((t) => (
+          <span key={t.id} className="feeling-chip">
+            {t.id}
+            {inUse.has(t.id) ? (
+              <span className="feel-search-via">in use</span>
+            ) : (
+              <button
+                className="chip-x"
+                onClick={() => softDelete(db.tracks, t.id)}
+                aria-label={`Remove ${t.id}`}
+              >
+                ×
+              </button>
+            )}
+          </span>
+        ))}
+        {(roster ?? []).length === 0 && (
+          <span className="muted small">none saved — rooms appear on their own once notes use them</span>
+        )}
+      </div>
+      <form
+        className="row"
+        style={{ marginTop: 8 }}
+        onSubmit={(e) => {
+          e.preventDefault()
+          const t = name.trim().toLowerCase()
+          if (t) void ensureTrack(t)
+          setName('')
+        }}
+      >
+        <input
+          type="text"
+          placeholder="add a room (e.g. group)…"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <button type="submit" className="btn-small">
+          add
+        </button>
+      </form>
+      <p className="muted small" style={{ marginBottom: 0 }}>
+        saved rooms sync to your other devices and show in every track picker, even before their
+        first note. a room already carrying notes can't be removed here — it exists in the data.
+      </p>
+    </>
   )
 }
 
@@ -189,6 +250,11 @@ export default function Settings() {
         <button className="btn-small btn-ghost" disabled={!!regenProgress} onClick={regenerateSummaries}>
           {regenProgress ?? '↻ regenerate all summaries (after editing the text above)'}
         </button>
+      </div>
+
+      <div className="card">
+        <h2>tracks (therapy rooms)</h2>
+        <TrackRoster />
       </div>
 
       <div className="card">
