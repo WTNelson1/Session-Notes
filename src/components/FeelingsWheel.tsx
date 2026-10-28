@@ -219,19 +219,20 @@ export default function FeelingsWheel({
     return () => document.removeEventListener('keydown', onKey)
   }, [searching])
 
-  if (searching) {
-    return (
-      <FeelingSearch
-        selected={selected}
-        onToggle={onToggle}
-        initial={seed}
-        onClose={() => {
-          setSearching(false)
-          setSeed('')
-        }}
-      />
-    )
-  }
+  // Rendered above the wheel or the family tree rather than instead of them —
+  // the picture you were just looking at stays put, and picks made from the
+  // results light up on it live.
+  const search = searching ? (
+    <FeelingSearch
+      selected={selected}
+      onToggle={onToggle}
+      initial={seed}
+      onClose={() => {
+        setSearching(false)
+        setSeed('')
+      }}
+    />
+  ) : null
 
   if (!focused) {
     const n = WHEEL.length
@@ -240,20 +241,22 @@ export default function FeelingsWheel({
       <div className="wheel-wrap">
         {/* a launcher, not a field: it holds no value — the first character
             carries into the search view, which takes over mid-word */}
-        <input
-          type="text"
-          className="wheel-search-input"
-          placeholder="⌕ start typing a feeling…"
-          value=""
-          aria-label="search feelings"
-          autoCapitalize="off"
-          autoCorrect="off"
-          spellCheck={false}
-          onChange={(e) => {
-            setSeed(e.target.value)
-            setSearching(true)
-          }}
-        />
+        {search ?? (
+          <input
+            type="text"
+            className="wheel-search-input"
+            placeholder="⌕ start typing a feeling…"
+            value=""
+            aria-label="search feelings"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
+            onChange={(e) => {
+              setSeed(e.target.value)
+              setSearching(true)
+            }}
+          />
+        )}
         <svg viewBox="0 0 360 360">
           {WHEEL.map((core, i) => {
             const start = i * step
@@ -313,6 +316,7 @@ export default function FeelingsWheel({
   const childW = Math.max(...focused.children.flatMap((m) => m.children.map((w) => w.length)))
   return (
     <div className="family-panel">
+      {search}
       <div className="row-between" style={{ marginBottom: 10 }}>
         <button className="btn-small btn-ghost" onClick={() => setFocused(null)}>
           ← all feelings

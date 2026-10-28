@@ -123,6 +123,9 @@ html {
   font-size: 12px;
   margin-bottom: 10px;
 }
+/* search floats above the wheel/tree, which stays put beneath it */
+.feel-search { margin-bottom: 12px; }
+.feel-search input { font-family: var(--mono); font-size: 12px; }
 .feel-search-results {
   display: flex;
   flex-wrap: wrap;
