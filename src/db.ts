@@ -141,10 +141,12 @@ export function alive<T extends BaseRec>(r: T): boolean {
   return !r.deleted
 }
 
-/** The room everything predating tracks belongs to: the original therapist.
- * Also the fallback whenever a record arrives without one (an old build's
- * edit, an un-run backfill), so untagged never means a fourth phantom room. */
-export const DEFAULT_TRACK = 'ann'
+/** The room everything predating tracks belongs to, and the fallback whenever
+ * a record arrives without one (an old build's edit, an un-run backfill), so
+ * untagged never means a phantom extra room. Deliberately a generic word: this
+ * repo gets forked, and a fork must not inherit anyone's therapist by name.
+ * (Existing data is unaffected — the backfill stamped it explicitly.) */
+export const DEFAULT_TRACK = 'therapy'
 
 export function trackOf(r: { track?: string }): string {
   return r.track || DEFAULT_TRACK

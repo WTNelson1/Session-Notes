@@ -78,6 +78,13 @@ function SyncButton({ sync }: { sync: ReturnType<typeof useSync> }) {
   )
 }
 
+// The suite dropdown is for the home deployment (and local dev). On a fork
+// there is one app and one owner — the wordmark renders plain, and nobody
+// inherits links into someone else's apps.
+const IS_SUITE =
+  typeof location !== 'undefined' &&
+  (location.hostname === 'wtnelson1.github.io' || location.hostname === 'localhost')
+
 // The suite. Each app's dot is its own accent — the palette is the wayfinding.
 const APPS = [
   { name: 'helm', url: 'https://helm-blush.vercel.app', color: '#7ad6c0' },
@@ -127,13 +134,11 @@ function Shell() {
     <>
       {/* Wide screens get Helm's folder tabs; narrow screens get the header +
           bottom bar. Both are always rendered — index.css shows one. */}
-      <TopNav items={NAV} apps={APPS} current="anchor" actions={actions} />
+      <TopNav items={NAV} apps={IS_SUITE ? APPS : []} current="anchor" actions={actions} />
 
       <div className="app-shell">
         <header className="app-header">
-          <h1>
-            <AppSwitcher apps={APPS} current="anchor" />
-          </h1>
+          <h1>{IS_SUITE ? <AppSwitcher apps={APPS} current="anchor" /> : <span>anchor</span>}</h1>
           <div className="header-actions">{actions}</div>
         </header>
 

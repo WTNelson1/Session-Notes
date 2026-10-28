@@ -68,7 +68,7 @@ export default function TopNav({
         {/* The wordmark is the app-switcher trigger, exactly as in the narrow
             header — it inherits its type from this block. */}
         <div className="top-nav-brand">
-          <AppSwitcher apps={apps} current={current} />
+          {apps.length > 1 ? <AppSwitcher apps={apps} current={current} /> : <span>{current}</span>}
         </div>
         <div className="top-nav-tabs">
           {items.map((item, i) => (
