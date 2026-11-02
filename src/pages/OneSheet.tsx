@@ -17,7 +17,13 @@ function shortStamp(t: number): string {
 
 const SNIPPET = 140
 function snippet(text: string): string {
-  const t = text.trim().replace(/\s+/g, ' ')
+  // notes are outlines — drop the bullet markers and run the lines together
+  const t = text
+    .split('\n')
+    .map((l) => l.replace(/^\s*[-*]\s?/, '').trim())
+    .filter(Boolean)
+    .join(' · ')
+    .replace(/\s+/g, ' ')
   return t.length > SNIPPET ? t.slice(0, SNIPPET).trimEnd() + '…' : t
 }
 
@@ -26,6 +32,10 @@ export default function OneSheet() {
   // same therapist repeatedly — and switchable from chips at the top.
   const [chosenTrack, setChosenTrack] = useDraft('anchor.sheetTrack', '')
   const { defaultTrack } = useTracks()
+  // Other rooms to brief this one on, remembered per main room: the group
+  // sheet stays group-only while one therapist's sheet can keep carrying the
+  // group material.
+  const [alsoMap, setAlsoMap] = useDraft<Record<string, string[]>>('anchor.sheetAlso', {})
 
   const data = useLiveQuery(async () => {
     const sessions = (await db.sessions.toArray())
@@ -67,6 +77,27 @@ export default function OneSheet() {
     const logs = data.logs.filter((l) => l.date >= boundaryDate)
 
   const tops = prep.filter((p) => !p.parentId && stillOpen(p) && trackOf(p) === track)
+
+  // Briefing material from the other rooms: what happened there since this
+  // room last met, and what is still open there. Read-only — its agenda is
+  // ordered on its own sheet.
+  const also = (alsoMap[track] ?? []).filter((t) => t !== track && sheetTracks.includes(t))
+  const toggleAlso = (t: string) =>
+    setAlsoMap({
+      ...alsoMap,
+      [track]: also.includes(t) ? also.filter((x) => x !== t) : [...also, t].sort(),
+    })
+  const briefings = also
+    .map((t) => ({
+      track: t,
+      sessions: sessions
+        .filter((x) => trackOf(x) === t && x.date >= boundaryDate)
+        .sort((a, b) => a.date.localeCompare(b.date)),
+      topics: prep
+        .filter((p) => !p.parentId && stillOpen(p) && trackOf(p) === t)
+        .sort((a, b) => (a.sheetOrder ?? a.createdAt) - (b.sheetOrder ?? b.createdAt)),
+    }))
+    .filter((b) => b.sessions.length > 0 || b.topics.length > 0)
   const kidsOf = (id: string) =>
     prep
       .filter((p) => p.parentId === id && !p.done)
@@ -121,7 +152,12 @@ export default function OneSheet() {
   const sinceLabel = last ? 'since last session' : 'this week'
 
   const empty =
-    !last && fresh.length === 0 && carried.length === 0 && journal.length === 0 && focus.length === 0
+    !last &&
+    fresh.length === 0 &&
+    carried.length === 0 &&
+    briefings.length === 0 &&
+    journal.length === 0 &&
+    focus.length === 0
 
   const topicLines = (items: PrepItem[]) =>
     items.map((t, i) => (
@@ -178,7 +214,7 @@ export default function OneSheet() {
       <div className="row-between">
         <span className="onesheet-title">anchor · session sheet</span>
         <span className="sheet-tag">
-          {sheetTracks.length > 1 ? `${track} · ` : ''}
+          {sheetTracks.length > 1 ? `${[track, ...also].join(' + ')} · ` : ''}
           {todayStr()}
         </span>
       </div>
@@ -194,6 +230,24 @@ export default function OneSheet() {
               {t}
             </button>
           ))}
+        </div>
+      )}
+      {sheetTracks.length > 1 && (
+        <div className="row no-print" style={{ gap: 6, marginTop: 6 }}>
+          <span className="sheet-tag">also brief on:</span>
+          {sheetTracks
+            .filter((t) => t !== track)
+            .map((t) => (
+              <button
+                key={t}
+                role="switch"
+                aria-checked={also.includes(t)}
+                className={`btn-small ${also.includes(t) ? 'btn-primary' : 'btn-ghost'}`}
+                onClick={() => toggleAlso(t)}
+              >
+                {also.includes(t) ? `✓ ${t}` : `＋ ${t}`}
+              </button>
+            ))}
         </div>
       )}
 
@@ -226,6 +280,36 @@ export default function OneSheet() {
           {topicLines(carried)}
         </section>
       )}
+
+      {briefings.map((b) => (
+        <section key={b.track}>
+          <p className="sheet-h">from {b.track} — for context</p>
+          {b.sessions.map((x) => (
+            <p key={x.id} className="sheet-body">
+              {shortStamp(new Date(x.date + 'T12:00:00').getTime())} ·{' '}
+              {x.summary ? `✦ ${x.summary}` : snippet(x.notes) || 'no notes'}
+            </p>
+          ))}
+          {b.topics.length > 0 && (
+            <>
+              {b.sessions.length > 0 && <p className="sheet-tag sheet-subhead">still open there</p>}
+              {b.topics.map((t) => (
+                <div key={t.id}>
+                  <p className="sheet-body">
+                    · {t.text}
+                    {t.bucket && <span className="sheet-tag"> ⌗{t.bucket}</span>}
+                  </p>
+                  {kidsOf(t.id).map((c) => (
+                    <p key={c.id} className="sheet-sub">
+                      – {c.text}
+                    </p>
+                  ))}
+                </div>
+              ))}
+            </>
+          )}
+        </section>
+      ))}
 
       {journal.length > 0 && (
         <section>

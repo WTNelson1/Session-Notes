@@ -605,3 +605,4 @@ details.help p, details.help ol {
 .track-row-counts { flex: 1; min-width: 0; }
 .track-row-actions { display: inline-flex; gap: 4px; margin-left: auto; }
 .track-row-note { flex-basis: 100%; }
+.sheet-subhead { display: block; margin: 6px 0 2px; letter-spacing: 0.08em; }
