@@ -1,6 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, alive, patch, stillOpen, todayStr, trackOf, DEFAULT_TRACK, type PrepItem } from '../db'
 import { useDraft } from '../autosave'
+import { useTracks } from '../tracks'
 
 // The sheet you hand her at the start of a session, in her reading order:
 // last time → new since → carried over → the week in feelings → practices.
@@ -24,6 +25,7 @@ export default function OneSheet() {
   // Which room this sheet is for. Sticky across visits — you print for the
   // same therapist repeatedly — and switchable from chips at the top.
   const [chosenTrack, setChosenTrack] = useDraft('anchor.sheetTrack', '')
+  const { defaultTrack } = useTracks()
 
   const data = useLiveQuery(async () => {
     const sessions = (await db.sessions.toArray())
@@ -51,7 +53,9 @@ export default function OneSheet() {
   ].sort()
   const track = sheetTracks.includes(chosenTrack)
     ? chosenTrack
-    : (sheetTracks[0] ?? DEFAULT_TRACK)
+    : sheetTracks.includes(defaultTrack)
+      ? defaultTrack
+      : (sheetTracks[0] ?? DEFAULT_TRACK)
 
   // "Last time" is the newest saved note IN THIS ROOM. Its createdAt is the
   // boundary: topics that existed before you started writing it were on the

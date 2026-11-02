@@ -583,3 +583,25 @@ details.help p, details.help ol {
 .track-new { max-width: 160px; padding: 6px 10px; font-size: 13px; }
 .session-meta { align-items: flex-end; flex-wrap: wrap; }
 .session-meta .field { margin-bottom: 0; }
+
+/* settings → tracks: one row per room */
+.track-list { display: flex; flex-direction: column; }
+.track-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.track-row:last-child { border-bottom: none; }
+.track-row-name { font-family: var(--mono); font-size: 13px; color: var(--text); }
+.track-default {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+}
+.track-row-counts { flex: 1; min-width: 0; }
+.track-row-actions { display: inline-flex; gap: 4px; margin-left: auto; }
+.track-row-note { flex-basis: 100%; }

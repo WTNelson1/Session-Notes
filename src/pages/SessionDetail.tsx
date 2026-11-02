@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, alive, newRec, patch, softDelete, stillOpen, todayStr, trackOf, DEFAULT_TRACK, type PrepItem } from '../db'
+import { db, alive, newRec, patch, softDelete, stillOpen, todayStr, trackOf, type PrepItem } from '../db'
 import OutlineEditor, {
   parseOutline,
   serializeOutline,
@@ -12,19 +12,11 @@ import { getSetting } from '../settings'
 import { useAutosave } from '../autosave'
 import Markdown from '../components/Markdown'
 import TrackSelect from '../components/TrackSelect'
+import { useTracks } from '../tracks'
 
 /** what a note looks like on disk — autosave compares these, not object identity */
 const sig = (date: string, notes: string, takeaways: string, track: string) =>
   `${date}\u0000${notes}\u0000${takeaways}\u0000${track}`
-
-/** the room a NEW note defaults to: wherever the last note was filed */
-function lastUsedTrack(): string {
-  try {
-    return localStorage.getItem('anchor.lastTrack') || DEFAULT_TRACK
-  } catch {
-    return DEFAULT_TRACK
-  }
-}
 
 export default function SessionDetail() {
   const { id } = useParams()
@@ -33,7 +25,11 @@ export default function SessionDetail() {
 
   const [sessionId, setSessionId] = useState<string | null>(isNew ? null : (id ?? null))
   const [date, setDate] = useState(todayStr())
-  const [track, setTrack] = useState(lastUsedTrack)
+  // A new note starts in the default room (Settings → tracks); an existing
+  // one loads its own, which pins it.
+  const tracks = useTracks()
+  const [pickedTrack, setTrack] = useState<string | null>(null)
+  const track = pickedTrack ?? tracks.defaultTrack
   const [outline, setOutline] = useState<OutlineLine[]>(() => parseOutline(''))
   const [takeaways, setTakeaways] = useState('')
   const [practiceText, setPracticeText] = useState('')
@@ -68,15 +64,7 @@ export default function SessionDetail() {
   }, [id, isNew])
 
   const prepItems = useLiveQuery(async () => (await db.prepItems.toArray()).filter(alive))
-  const allSessions = useLiveQuery(async () => (await db.sessions.toArray()).filter(alive))
-  const roster = useLiveQuery(async () => (await db.tracks.toArray()).filter(alive))
-  const knownTracks = [
-    ...new Set([
-      ...(roster ?? []).map((t) => t.id),
-      ...(allSessions ?? []).map(trackOf),
-      ...(prepItems ?? []).filter((p) => !p.parentId).map(trackOf),
-    ]),
-  ]
+  const knownTracks = tracks.known
   const openTops = (prepItems ?? [])
     .filter((p) => !p.parentId && stillOpen(p) && trackOf(p) === track)
     .sort((a, b) => b.createdAt - a.createdAt)
@@ -93,11 +81,6 @@ export default function SessionDetail() {
 
   async function save(): Promise<string> {
     const notes = serializeOutline(outline)
-    try {
-      localStorage.setItem('anchor.lastTrack', track)
-    } catch {
-      // fine — the default just stays wherever it was
-    }
     if (sessionId) {
       await patch(db.sessions, sessionId, { date, track, notes, takeaways })
       return sessionId

@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, alive, newRec, patch, softDelete, stillOpen, trackOf, DEFAULT_TRACK, type PrepItem } from '../db'
+import { db, alive, newRec, patch, softDelete, stillOpen, trackOf, type PrepItem } from '../db'
 import EditableText from '../components/EditableText'
 import { bulletsFromDump, type DumpTopic } from '../ai'
 import { getSetting } from '../settings'
 import { useDraft } from '../autosave'
 import TrackSelect from '../components/TrackSelect'
+import { useTracks } from '../tracks'
 
 function SubItemInput({ parentId }: { parentId: string }) {
   const [text, setText] = useState('')
@@ -301,12 +302,13 @@ function BrainDump({ buckets, track }: { buckets: string[]; track: string }) {
 
 export default function Prep() {
   const [text, setText] = useState('')
-  const [track, setTrack] = useDraft('anchor.prepTrack', DEFAULT_TRACK)
+  const tracks = useTracks()
+  const [pickedTrack, setTrack] = useState<string | null>(null)
+  const track = pickedTrack ?? tracks.defaultTrack
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [pickingId, setPickingId] = useState<string | null>(null)
 
   const items = useLiveQuery(async () => (await db.prepItems.toArray()).filter(alive))
-  const sessions = useLiveQuery(async () => (await db.sessions.toArray()).filter(alive))
 
   const tops = (items ?? [])
     .filter((i) => !i.parentId)
@@ -323,15 +325,7 @@ export default function Prep() {
     .sort((a, b) => (b.letGoAt ?? 0) - (a.letGoAt ?? 0))
 
   const buckets = [...new Set(open.map((i) => i.bucket).filter(Boolean) as string[])].sort()
-  const roster = useLiveQuery(async () => (await db.tracks.toArray()).filter(alive))
-  const knownTracks = [
-    ...new Set([
-      ...(roster ?? []).map((t) => t.id),
-      ...(sessions ?? []).map(trackOf),
-      ...tops.map(trackOf),
-      track,
-    ]),
-  ].sort()
+  const knownTracks = [...new Set([...tracks.known, track])].sort()
   const queueTracks = [...new Set(open.map(trackOf))].sort()
 
   async function add() {

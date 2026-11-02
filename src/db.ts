@@ -87,7 +87,11 @@ export interface Insight extends BaseRec {
  * one exist before its first record does (and across devices, since it syncs
  * as ordinary data; settings taught us not to bolt more fields onto the
  * settings blob). */
-export interface Track extends BaseRec {}
+export interface Track extends BaseRec {
+  /** set when this room was made the default; the newest stamp wins (see
+   * pickDefault in tracks.ts) — a per-record field, so it syncs like any edit */
+  defaultAt?: number
+}
 
 class AnchorDB extends Dexie {
   prepItems!: Table<PrepItem, string>
@@ -159,6 +163,41 @@ export async function ensureTrack(name: string) {
   const existing = await db.tracks.get(name)
   if (existing && !existing.deleted) return
   await db.tracks.put({ id: name, createdAt: existing?.createdAt ?? now, updatedAt: now })
+}
+
+/** Star a room as where new sessions and topics start. */
+export async function setDefaultTrack(name: string) {
+  const now = Date.now()
+  const existing = await db.tracks.get(name)
+  await db.tracks.put({ id: name, createdAt: existing?.createdAt ?? now, updatedAt: now, defaultAt: now })
+}
+
+/** Rename a room everywhere it appears — or, when `to` already exists, fold
+ * one room into the other. Re-tags every session and top-level topic (done and
+ * let-go included, so history moves with it); sub-items follow their parent.
+ * The ★ travels with the room it was on. */
+export async function renameTrack(from: string, to: string) {
+  if (!to || to === from) return
+  const now = Date.now()
+  await db.transaction('rw', db.tracks, db.sessions, db.prepItems, async () => {
+    for (const s of await db.sessions.toArray())
+      if (!s.deleted && trackOf(s) === from) await db.sessions.update(s.id, { track: to, updatedAt: now })
+    for (const p of await db.prepItems.toArray())
+      if (!p.deleted && !p.parentId && trackOf(p) === from)
+        await db.prepItems.update(p.id, { track: to, updatedAt: now })
+    const old = await db.tracks.get(from)
+    const target = await db.tracks.get(to)
+    const oldLive = old && !old.deleted ? old : undefined
+    const targetLive = target && !target.deleted ? target : undefined
+    const defaultAt = oldLive?.defaultAt ? now : targetLive?.defaultAt
+    await db.tracks.put({
+      id: to,
+      createdAt: target?.createdAt ?? old?.createdAt ?? now,
+      updatedAt: now,
+      ...(defaultAt ? { defaultAt } : {}),
+    })
+    if (oldLive) await db.tracks.update(from, { deleted: now, updatedAt: now })
+  })
 }
 
 /** One-time per device: stamp pre-track sessions and topics explicitly, so the

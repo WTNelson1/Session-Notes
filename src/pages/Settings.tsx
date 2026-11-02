@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { db, TABLES, alive, ensureTrack, patch, softDelete, trackOf } from '../db'
+import { db, TABLES, alive, ensureTrack, patch, renameTrack, setDefaultTrack, softDelete } from '../db'
+import { useTracks, type TrackUsage } from '../tracks'
 import { getSetting, setSetting, type SettingKey } from '../settings'
 import { localSnapshot, importData, syncNow } from '../sync'
-import { useLiveQuery } from 'dexie-react-hooks'
 import { summarizeSession, textHash } from '../ai'
 
 function SettingInput({
@@ -91,36 +91,128 @@ function SettingInput({
   )
 }
 
-/** The roster of rooms: add one before its first session exists; × retires it
- * from the pickers. Rooms whose notes still carry the tag keep appearing in
- * grouped views regardless — data outranks the roster. */
+function TrackRow({
+  name,
+  usage,
+  isDefault,
+  others,
+}: {
+  name: string
+  usage?: TrackUsage
+  isDefault: boolean
+  others: string[]
+}) {
+  const [renaming, setRenaming] = useState(false)
+  const [draft, setDraft] = useState(name)
+  const target = draft.trim().toLowerCase()
+  const merging = target !== name && others.includes(target)
+  const counts = [
+    usage?.sessions ? `${usage.sessions} ${usage.sessions === 1 ? 'note' : 'notes'}` : '',
+    usage?.topics ? `${usage.topics} ${usage.topics === 1 ? 'topic' : 'topics'}` : '',
+  ].filter(Boolean)
+  const inUse = counts.length > 0
+
+  if (renaming) {
+    return (
+      <form
+        className="track-row"
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (target && target !== name) void renameTrack(name, target)
+          setRenaming(false)
+        }}
+      >
+        <input
+          autoFocus
+          type="text"
+          className="track-new"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setRenaming(false)
+          }}
+        />
+        <button
+          type="submit"
+          className={`btn-small ${merging ? 'btn-danger' : 'btn-primary'}`}
+          disabled={!target || target === name}
+        >
+          {merging ? `merge into ${target}` : 'rename'}
+        </button>
+        <button type="button" className="btn-small btn-ghost" onClick={() => setRenaming(false)}>
+          cancel
+        </button>
+        {merging && (
+          <span className="muted small track-row-note">
+            everything in {name} moves to {target}. there is no splitting them back apart.
+          </span>
+        )}
+      </form>
+    )
+  }
+
+  return (
+    <div className="track-row">
+      <span className="track-row-name">{name}</span>
+      {isDefault && <span className="track-default">★ default</span>}
+      <span className="muted small track-row-counts">{inUse ? counts.join(' · ') : 'empty'}</span>
+      <span className="track-row-actions">
+        {!isDefault && (
+          <button className="btn-small btn-ghost" onClick={() => void setDefaultTrack(name)}>
+            make default
+          </button>
+        )}
+        <button
+          className="btn-small btn-ghost"
+          onClick={() => {
+            setDraft(name)
+            setRenaming(true)
+          }}
+        >
+          rename
+        </button>
+        {!inUse && (
+          <button
+            className="btn-small btn-ghost"
+            onClick={() => softDelete(db.tracks, name)}
+            aria-label={`Remove ${name}`}
+            title="remove"
+          >
+            ×
+          </button>
+        )}
+      </span>
+    </div>
+  )
+}
+
+/** Every room — saved ones and any a note or topic is tagged with — with the
+ * default, renames, and merges. Rename into an existing name to fold two rooms
+ * together. Only empty rooms can be removed; a room with notes in it is
+ * renamed or merged instead, so nothing is ever left pointing at nowhere. */
 function TrackRoster() {
   const [name, setName] = useState('')
-  const roster = useLiveQuery(async () => (await db.tracks.toArray()).filter(alive))
-  const sessions = useLiveQuery(async () => (await db.sessions.toArray()).filter(alive))
-  const inUse = new Set((sessions ?? []).map(trackOf))
+  const { known, usage, defaultTrack, starred, ready } = useTracks()
 
   return (
     <>
-      <div className="chip-row" style={{ marginTop: 0 }}>
-        {(roster ?? []).map((t) => (
-          <span key={t.id} className="feeling-chip">
-            {t.id}
-            {inUse.has(t.id) ? (
-              <span className="feel-search-via">in use</span>
-            ) : (
-              <button
-                className="chip-x"
-                onClick={() => softDelete(db.tracks, t.id)}
-                aria-label={`Remove ${t.id}`}
-              >
-                ×
-              </button>
-            )}
-          </span>
+      <p className="muted small" style={{ marginTop: 0 }}>
+        new session notes and jotted topics start in the ★ room
+        {starred ? '' : ' (until you pick one, that is the busiest room)'} — one tap switches any
+        single one.
+      </p>
+      <div className="track-list">
+        {known.map((t) => (
+          <TrackRow
+            key={t}
+            name={t}
+            usage={usage.get(t)}
+            isDefault={t === defaultTrack}
+            others={known.filter((o) => o !== t)}
+          />
         ))}
-        {(roster ?? []).length === 0 && (
-          <span className="muted small">none saved — rooms appear on their own once notes use them</span>
+        {ready && known.length === 0 && (
+          <span className="muted small">no tracks yet — your first session note creates one</span>
         )}
       </div>
       <form
@@ -135,18 +227,14 @@ function TrackRoster() {
       >
         <input
           type="text"
-          placeholder="add a room (e.g. group)…"
+          placeholder="add a track (e.g. group)…"
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
-        <button type="submit" className="btn-small">
+        <button type="submit" className="btn-small" disabled={!name.trim()}>
           add
         </button>
       </form>
-      <p className="muted small" style={{ marginBottom: 0 }}>
-        saved rooms sync to your other devices and show in every track picker, even before their
-        first note. a room already carrying notes can't be removed here — it exists in the data.
-      </p>
     </>
   )
 }

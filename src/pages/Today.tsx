@@ -4,6 +4,8 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, alive, newRec, softDelete, todayStr, stillOpen, trackOf } from '../db'
 import FeelingChips from '../components/FeelingChips'
 import FeelingsWheel from '../components/FeelingsWheel'
+import TrackSelect from '../components/TrackSelect'
+import { useTracks } from '../tracks'
 
 export default function Today() {
   const today = todayStr()
@@ -11,6 +13,11 @@ export default function Today() {
   const [flash, setFlash] = useState(false)
   const [jot, setJot] = useState('')
   const [jotFlash, setJotFlash] = useState(false)
+  // Starts on the default room every visit; a tap re-files the next jots
+  // until you leave the page.
+  const tracks = useTracks()
+  const [pickedTrack, setJotTrack] = useState<string | null>(null)
+  const jotTrack = pickedTrack ?? tracks.defaultTrack
 
   const openPrep = useLiveQuery(async () =>
     (await db.prepItems.where('done').equals(0).toArray())
@@ -53,7 +60,7 @@ export default function Today() {
   async function addJot() {
     const t = jot.trim()
     if (!t) return
-    await db.prepItems.add({ ...newRec(), text: t, done: 0 })
+    await db.prepItems.add({ ...newRec(), text: t, done: 0, track: jotTrack })
     setJot('')
     setJotFlash(true)
     setTimeout(() => setJotFlash(false), 1500)
@@ -162,6 +169,11 @@ export default function Today() {
             {jotFlash ? '✓' : 'add'}
           </button>
         </form>
+        {tracks.known.length > 1 && (
+          <div style={{ marginTop: 8 }}>
+            <TrackSelect value={jotTrack} tracks={tracks.known} onChange={setJotTrack} ariaLabel="Track for this jot" />
+          </div>
+        )}
         {openPrep && openPrep.length > 0 && (
           <div style={{ marginTop: 4 }}>
             {openPrep.slice(0, 4).map((p) => (
