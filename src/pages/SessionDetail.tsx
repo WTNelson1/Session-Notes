@@ -7,7 +7,8 @@ import OutlineEditor, {
   serializeOutline,
   type OutlineLine,
 } from '../components/OutlineEditor'
-import { summarizeSession, reviewSession, textHash, REVIEW_MIN_CHARS, aiConfigured } from '../ai'
+import { summarizeSession, reviewSession, textHash, REVIEW_MIN_CHARS } from '../ai'
+import { getSetting } from '../settings'
 import { useAutosave } from '../autosave'
 import Markdown from '../components/Markdown'
 import TrackSelect from '../components/TrackSelect'
@@ -112,8 +113,8 @@ export default function SessionDetail() {
 
   /** background: five-section review, only for substantial notes, cached by hash */
   async function maybeReview(sid: string) {
-    const aiReady = aiConfigured()
-    if (!aiReady || reviewInFlight.current) return
+    const apiKey = getSetting('apiKey')
+    if (!apiKey || reviewInFlight.current) return
     const s = await db.sessions.get(sid)
     if (!s || s.notes.trim().length < REVIEW_MIN_CHARS) return
     const hash = textHash('r|' + s.notes + '|' + s.takeaways)
@@ -129,7 +130,7 @@ export default function SessionDetail() {
         .filter((h) => h.id !== sid && h.notes.trim() && h.date <= s.date)
         .sort((a, b) => b.date.localeCompare(a.date))
         .slice(0, 3)
-      const result = await reviewSession(s, history)
+      const result = await reviewSession(apiKey, s, history)
       if (result) {
         await patch(db.sessions, sid, { review: result, reviewHash: hash })
         setReview(result)
@@ -144,15 +145,15 @@ export default function SessionDetail() {
 
   /** background: distill the note into the ✦ list preview (skips if unchanged) */
   async function maybeSummarize(sid: string) {
-    const aiReady = aiConfigured()
+    const apiKey = getSetting('apiKey')
     const notes = serializeOutline(outline)
-    if (!aiReady || !notes.trim()) return
+    if (!apiKey || !notes.trim()) return
     const hash = textHash(notes + '|' + takeaways)
     const existing = await db.sessions.get(sid)
     if (existing?.summaryHash === hash && existing.summary) return
     setSummarizing(true)
     try {
-      const fresh = await summarizeSession(notes, takeaways)
+      const fresh = await summarizeSession(apiKey, notes, takeaways)
       if (fresh) {
         await patch(db.sessions, sid, { summary: fresh, summaryHash: hash })
         setSummary(fresh)

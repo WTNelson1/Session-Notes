@@ -8,222 +8,6 @@ function aboutBlock(): string {
   return about ? `\n\nAbout the author, in their own words: ${about}` : ''
 }
 
-/* ---------- provider: claude, or a model on your own machine ---------- */
-
-export type Provider = 'claude' | 'local'
-
-export function aiProvider(): Provider {
-  return getSetting('aiProvider') === 'local' ? 'local' : 'claude'
-}
-
-/** whether the AI features have somewhere to send their requests */
-export function aiConfigured(): boolean {
-  return aiProvider() === 'local'
-    ? !!getSetting('localUrl') && !!getSetting('localModel')
-    : !!getSetting('apiKey')
-}
-
-interface Ask {
-  system: string
-  user: string
-  maxTokens: number
-  /** shown when the model declines */
-  refusal: string
-}
-
-function claude() {
-  return new Anthropic({ apiKey: getSetting('apiKey'), dangerouslyAllowBrowser: true })
-}
-
-// Opus 5's safety classifiers can occasionally decline benign requests; the
-// server-side fallback re-runs those on Opus 4.8 in the same call.
-const CLAUDE_MODEL = {
-  model: 'claude-opus-5',
-  betas: ['server-side-fallback-2026-06-01'],
-  fallbacks: [{ model: 'claude-opus-4-8' }],
-}
-
-/** The local server's root, however it was pasted: with or without a
- * trailing slash or /v1. */
-export function localBase(url = getSetting('localUrl')): string {
-  return url.trim().replace(/\/+$/, '').replace(/\/v1$/, '')
-}
-
-function unreachable(base: string): string {
-  const insecure =
-    location.protocol === 'https:' &&
-    base.startsWith('http:') &&
-    !/^http:\/\/(localhost|127\.0\.0\.1)(:|$)/.test(base)
-  return (
-    `can't reach the local model at ${base} — is the studio awake and the server running?` +
-    (insecure
-      ? ' this page is https, so from another device the address has to be https too (see settings).'
-      : '')
-  )
-}
-
-/** OpenAI-style chat endpoint — what LM Studio and Ollama both serve. A local
- * failure is reported, never quietly retried on Claude: the point of choosing
- * local is that notes stay on your machines. */
-async function localChat(body: Record<string, unknown>): Promise<Response> {
-  const base = localBase()
-  let res: Response
-  try {
-    res = await fetch(`${base}/v1/chat/completions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: getSetting('localModel'), ...body }),
-    })
-  } catch {
-    throw new Error(unreachable(base))
-  }
-  if (!res.ok) {
-    let detail = ''
-    try {
-      const j = await res.json()
-      detail = typeof j?.error === 'string' ? j.error : (j?.error?.message ?? '')
-    } catch {
-      // no json body — the status alone will have to do
-    }
-    throw new Error(`local model error ${res.status}${detail ? `: ${detail}` : ''}`)
-  }
-  return res
-}
-
-/** Reasoning models can put their thinking inline in <think> tags; only the
- * answer is the author's. An unclosed tag means it is still thinking. */
-function visible(text: string): string {
-  return text
-    .replace(/<think>[\s\S]*?<\/think>/g, '')
-    .replace(/<think>[\s\S]*$/, '')
-    .trimStart()
-}
-
-const messagesOf = (ask: Ask) => [
-  { role: 'system', content: ask.system },
-  { role: 'user', content: ask.user },
-]
-
-/** The models a local server has available — for the picker in settings. */
-export async function listLocalModels(url: string): Promise<string[]> {
-  const base = localBase(url)
-  let res: Response
-  try {
-    res = await fetch(`${base}/v1/models`)
-  } catch {
-    throw new Error(unreachable(base))
-  }
-  if (!res.ok) throw new Error(`local server answered ${res.status}`)
-  const j = await res.json()
-  return Array.isArray(j?.data) ? j.data.map((m: { id: string }) => m.id).filter(Boolean) : []
-}
-
-async function complete(ask: Ask): Promise<string> {
-  if (aiProvider() === 'local') {
-    // no max_tokens: a reasoning model spends tokens thinking first, and a
-    // cap sized for the answer would cut it off before it got there
-    const j = await (await localChat({ messages: messagesOf(ask) })).json()
-    return visible(j?.choices?.[0]?.message?.content ?? '').trim()
-  }
-  const resp = await claude().beta.messages.create({
-    ...CLAUDE_MODEL,
-    max_tokens: ask.maxTokens,
-    system: ask.system,
-    messages: [{ role: 'user', content: ask.user }],
-  })
-  if (resp.stop_reason === 'refusal') throw new Error(ask.refusal)
-  return resp.content
-    .filter((b) => b.type === 'text')
-    .map((b) => b.text)
-    .join('')
-    .trim()
-}
-
-async function streamText(ask: Ask, onDelta: (text: string) => void): Promise<string> {
-  if (aiProvider() === 'local') {
-    const res = await localChat({ messages: messagesOf(ask), stream: true })
-    const reader = res.body!.getReader()
-    const decoder = new TextDecoder()
-    let buffer = ''
-    let full = ''
-    let shown = ''
-    for (;;) {
-      const { done, value } = await reader.read()
-      if (done) break
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n')
-      buffer = lines.pop() ?? ''
-      for (const line of lines) {
-        const data = line.trim().replace(/^data:\s*/, '')
-        if (!data || data === '[DONE]' || !line.trim().startsWith('data:')) continue
-        try {
-          full += JSON.parse(data)?.choices?.[0]?.delta?.content ?? ''
-        } catch {
-          continue // a keep-alive or partial frame
-        }
-        const now = visible(full)
-        if (now.length > shown.length && now.startsWith(shown)) {
-          onDelta(now.slice(shown.length))
-          shown = now
-        }
-      }
-    }
-    return visible(full).trim()
-  }
-  const stream = claude().beta.messages.stream({
-    ...CLAUDE_MODEL,
-    max_tokens: ask.maxTokens,
-    system: ask.system,
-    messages: [{ role: 'user', content: ask.user }],
-  })
-  stream.on('text', onDelta)
-  const final = await stream.finalMessage()
-  if (final.stop_reason === 'refusal') throw new Error(ask.refusal)
-  return final.content
-    .filter((b) => b.type === 'text')
-    .map((b) => b.text)
-    .join('')
-}
-
-/** Structured output: Claude via a forced strict tool call, a local model via
- * a JSON-schema response format. Either way the caller normalizes the result. */
-async function structured(ask: Ask, tool: Anthropic.Beta.BetaTool): Promise<unknown> {
-  if (aiProvider() === 'local') {
-    const res = await localChat({
-      messages: messagesOf({
-        ...ask,
-        system: ask.system.replace(
-          'Return your answer only by calling the topics tool.',
-          'Reply with only a JSON object matching the schema — no prose around it.',
-        ),
-      }),
-      response_format: {
-        type: 'json_schema',
-        json_schema: { name: tool.name, strict: true, schema: tool.input_schema },
-      },
-    })
-    const text = visible((await res.json())?.choices?.[0]?.message?.content ?? '')
-    const start = text.indexOf('{')
-    const end = text.lastIndexOf('}')
-    try {
-      return JSON.parse(text.slice(start, end + 1))
-    } catch {
-      throw new Error("the local model's answer wasn't usable — try again")
-    }
-  }
-  const resp = await claude().beta.messages.create({
-    ...CLAUDE_MODEL,
-    max_tokens: ask.maxTokens,
-    system: ask.system,
-    tools: [tool],
-    tool_choice: { type: 'tool', name: tool.name },
-    messages: [{ role: 'user', content: ask.user }],
-  })
-  if (resp.stop_reason === 'refusal') throw new Error(ask.refusal)
-  for (const block of resp.content) if (block.type === 'tool_use') return block.input
-  throw new Error('nothing came back — try again')
-}
-
 const SYSTEM = `You are a thoughtful companion inside a private therapy-notes app. The user will share their own journal: therapy session notes, session-prep topics, feelings check-ins from an emotion wheel (they are practicing naming feelings precisely — acknowledge and reinforce that skill), journal entries, and between-session practices.
 
 Your job is to help them see their own material more clearly:
@@ -389,15 +173,33 @@ export function textHash(s: string): string {
 }
 
 /** Distill a session note into a 1-2 sentence scannable preview. */
-export async function summarizeSession(notes: string, takeaways: string): Promise<string> {
-  return complete({
-    maxTokens: 300,
-    refusal: 'summary declined',
+export async function summarizeSession(
+  apiKey: string,
+  notes: string,
+  takeaways: string,
+): Promise<string> {
+  const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true })
+  const resp = await client.beta.messages.create({
+    model: 'claude-opus-5',
+    max_tokens: 300,
+    betas: ['server-side-fallback-2026-06-01'],
+    fallbacks: [{ model: 'claude-opus-4-8' }],
     system:
       'You write one-line previews of therapy session notes, so the author can recognize a session at a glance in a list. Capture the main focus and the single biggest point or shift. 1-2 sentences, at most ~35 words, plain prose, lowercase, no preamble, no quotes around the output. Refer to the author as "you" (e.g. "explored your pattern of…") — never in the third person, and never guess at pronouns or gender.' +
       aboutBlock(),
-    user: `Summarize this session note:\n\n<note>\n${notes}${takeaways.trim() ? `\n\nTakeaways: ${takeaways}` : ''}\n</note>`,
+    messages: [
+      {
+        role: 'user',
+        content: `Summarize this session note:\n\n<note>\n${notes}${takeaways.trim() ? `\n\nTakeaways: ${takeaways}` : ''}\n</note>`,
+      },
+    ],
   })
+  if (resp.stop_reason === 'refusal') throw new Error('summary declined')
+  return resp.content
+    .filter((b) => b.type === 'text')
+    .map((b) => b.text)
+    .join('')
+    .trim()
 }
 
 /** notes shorter than this get no auto-review — thin material invites invention */
@@ -429,26 +231,44 @@ Grounding rules — these override everything else:
 /** Generate the five-section review for one session, grounded in its note
  * plus up to three earlier sessions (for continuity only). */
 export async function reviewSession(
+  apiKey: string,
   session: { date: string; notes: string; takeaways: string; track?: string },
   history: { date: string; notes: string; takeaways: string; track?: string }[],
 ): Promise<string> {
+  const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true })
   const earlier = history
     .map(
       (h) =>
         `<session date="${h.date}">\n${h.notes}${h.takeaways.trim() ? `\nTakeaways: ${h.takeaways}` : ''}\n</session>`,
     )
     .join('\n')
-  return complete({
-    maxTokens: 1500,
-    refusal: 'review declined',
+  const resp = await client.beta.messages.create({
+    model: 'claude-opus-5',
+    max_tokens: 1500,
+    betas: ['server-side-fallback-2026-06-01'],
+    fallbacks: [{ model: 'claude-opus-4-8' }],
     system: REVIEW_SYSTEM + aboutBlock(),
-    user: `Review this session:\n\n<session date="${session.date}">\n${session.notes}${session.takeaways.trim() ? `\n\nTakeaways: ${session.takeaways}` : ''}\n</session>\n\n<earlier_sessions>\n${earlier || '(none)'}\n</earlier_sessions>`,
+    messages: [
+      {
+        role: 'user',
+        content: `Review this session:\n\n<session date="${session.date}">\n${session.notes}${session.takeaways.trim() ? `\n\nTakeaways: ${session.takeaways}` : ''}\n</session>\n\n<earlier_sessions>\n${earlier || '(none)'}\n</earlier_sessions>`,
+      },
+    ],
   })
+  if (resp.stop_reason === 'refusal') throw new Error('review declined')
+  return resp.content
+    .filter((b) => b.type === 'text')
+    .map((b) => b.text)
+    .join('')
+    .trim()
 }
 
-/** Stream an insight. Calls onDelta with each text chunk; resolves with the
- * full text. */
+/**
+ * Stream an insight from Claude. Calls onDelta with each text chunk;
+ * resolves with the full text.
+ */
 export async function runInsight(
+  apiKey: string,
   question: string,
   context: string,
   onDelta: (text: string) => void,
@@ -456,15 +276,34 @@ export async function runInsight(
   if (!context.trim()) {
     throw new Error('There are no notes in this time range yet — add some entries first.')
   }
-  return streamText(
-    {
-      maxTokens: 8000,
-      refusal: 'The model declined this request. Try rephrasing your question.',
-      system: SYSTEM + aboutBlock(),
-      user: `${question}\n\nHere is my journal:\n\n<journal>\n${context}\n</journal>`,
-    },
-    onDelta,
-  )
+  const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true })
+
+  const stream = client.beta.messages.stream({
+    model: 'claude-opus-5',
+    max_tokens: 8000,
+    // Opus 5's safety classifiers can occasionally decline benign requests;
+    // the server-side fallback re-runs those on Opus 4.8 in the same call.
+    betas: ['server-side-fallback-2026-06-01'],
+    fallbacks: [{ model: 'claude-opus-4-8' }],
+    system: SYSTEM + aboutBlock(),
+    messages: [
+      {
+        role: 'user',
+        content: `${question}\n\nHere is my journal:\n\n<journal>\n${context}\n</journal>`,
+      },
+    ],
+  })
+
+  stream.on('text', onDelta)
+  const final = await stream.finalMessage()
+
+  if (final.stop_reason === 'refusal') {
+    throw new Error('The model declined this request. Try rephrasing your question.')
+  }
+  return final.content
+    .filter((b) => b.type === 'text')
+    .map((b) => b.text)
+    .join('')
 }
 
 /* ---------- brain dump → prep topics ---------- */
@@ -556,15 +395,32 @@ export function normalizeTopics(raw: unknown, buckets: string[]): DumpTopic[] {
 }
 
 /** Parse a brain dump into reviewable prep topics. Nothing is saved here. */
-export async function bulletsFromDump(dump: string, buckets: string[]): Promise<DumpTopic[]> {
-  const raw = await structured(
-    {
-      maxTokens: 2000,
-      refusal: 'the model declined this one — you can still add topics by hand',
-      system: DUMP_SYSTEM + aboutBlock(),
-      user: `My existing buckets: ${buckets.length ? buckets.join(', ') : '(none yet)'}\n\nHere is the dump:\n\n<dump>\n${dump}\n</dump>`,
-    },
-    TOPICS_TOOL,
-  )
-  return normalizeTopics(raw, buckets)
+export async function bulletsFromDump(
+  apiKey: string,
+  dump: string,
+  buckets: string[],
+): Promise<DumpTopic[]> {
+  const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true })
+  const resp = await client.beta.messages.create({
+    model: 'claude-opus-5',
+    max_tokens: 2000,
+    betas: ['server-side-fallback-2026-06-01'],
+    fallbacks: [{ model: 'claude-opus-4-8' }],
+    system: DUMP_SYSTEM + aboutBlock(),
+    tools: [TOPICS_TOOL],
+    tool_choice: { type: 'tool', name: 'topics' },
+    messages: [
+      {
+        role: 'user',
+        content: `My existing buckets: ${buckets.length ? buckets.join(', ') : '(none yet)'}\n\nHere is the dump:\n\n<dump>\n${dump}\n</dump>`,
+      },
+    ],
+  })
+  if (resp.stop_reason === 'refusal') {
+    throw new Error('the model declined this one — you can still add topics by hand')
+  }
+  for (const block of resp.content) {
+    if (block.type === 'tool_use') return normalizeTopics(block.input, buckets)
+  }
+  throw new Error('nothing came back — try again')
 }

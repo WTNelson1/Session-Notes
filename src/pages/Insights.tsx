@@ -2,7 +2,8 @@ import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, alive, newRec, patch, softDelete } from '../db'
-import { PRESETS, buildContext, runInsight, aiConfigured } from '../ai'
+import { PRESETS, buildContext, runInsight } from '../ai'
+import { getSetting } from '../settings'
 import Markdown from '../components/Markdown'
 import EditableText from '../components/EditableText'
 import { useDraft } from '../autosave'
@@ -20,7 +21,7 @@ const RANGES = [
 ] as const
 
 export default function Insights() {
-  const aiReady = aiConfigured()
+  const apiKey = getSetting('apiKey')
   const [rangeIdx, setRangeIdx] = useState(1)
   const [custom, setCustom] = useDraft('anchor.insightQuestion', '')
   const [running, setRunning] = useState(false)
@@ -44,7 +45,7 @@ export default function Insights() {
     try {
       const context = await buildContext(RANGES[rangeIdx].days)
       let acc = ''
-      const full = await runInsight(question, context, (delta) => {
+      const full = await runInsight(apiKey, question, context, (delta) => {
         acc += delta
         setOutput(acc)
       })
@@ -63,13 +64,14 @@ export default function Insights() {
     setActiveTitle('')
   }
 
-  if (!aiReady) {
+  if (!apiKey) {
     return (
       <div className="card">
         <h2>AI insights</h2>
         <p className="muted">
-          set up ai in <Link to="/settings">settings</Link> to enable insights · your notes are
-          only sent to the model when you run an analysis — never in the background.
+          add your anthropic api key in <Link to="/settings">settings</Link> to enable insights ·
+          your notes are only sent to the claude api when you run an analysis — never in the
+          background.
         </p>
       </div>
     )

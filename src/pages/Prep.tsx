@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, alive, newRec, patch, softDelete, stillOpen, trackOf, type PrepItem } from '../db'
 import EditableText from '../components/EditableText'
-import { bulletsFromDump, type DumpTopic, aiConfigured } from '../ai'
+import { bulletsFromDump, type DumpTopic } from '../ai'
+import { getSetting } from '../settings'
 import { useDraft } from '../autosave'
 import TrackSelect from '../components/TrackSelect'
 import { useTracks } from '../tracks'
@@ -122,7 +123,7 @@ function BrainDump({ buckets, track }: { buckets: string[]; track: string }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
-  const aiReady = aiConfigured()
+  const apiKey = getSetting('apiKey')
 
   const editTopic = (i: number, changes: Partial<DumpTopic>) =>
     setDraft((d) => d && d.map((t, n) => (n === i ? { ...t, ...changes } : t)))
@@ -141,7 +142,7 @@ function BrainDump({ buckets, track }: { buckets: string[]; track: string }) {
     setBusy(true)
     setError('')
     try {
-      const topics = await bulletsFromDump(dump.trim(), buckets)
+      const topics = await bulletsFromDump(apiKey, dump.trim(), buckets)
       if (topics.length) setDraft(topics)
       else setError('nothing in there read as a topic — add a bit more, or write it in by hand')
     } catch (e) {
@@ -205,7 +206,7 @@ function BrainDump({ buckets, track }: { buckets: string[]; track: string }) {
           <div className="row">
             <button
               className="btn-primary btn-small"
-              disabled={!dump.trim() || !aiReady || busy}
+              disabled={!dump.trim() || !apiKey || busy}
               onClick={() => void parse()}
             >
               {busy ? 'sorting…' : '✦ make bullets'}
@@ -219,7 +220,7 @@ function BrainDump({ buckets, track }: { buckets: string[]; track: string }) {
             >
               close
             </button>
-            {!aiReady && <span className="muted small">set up ai in settings first</span>}
+            {!apiKey && <span className="muted small">add your api key in settings first</span>}
           </div>
         </>
       )}
