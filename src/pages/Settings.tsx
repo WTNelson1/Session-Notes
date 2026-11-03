@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { db, TABLES, alive, ensureTrack, patch, renameTrack, setDefaultTrack, softDelete } from '../db'
 import { useTracks, type TrackUsage } from '../tracks'
 import { getSetting, setSetting, type SettingKey } from '../settings'
-import { localSnapshot, importData, syncNow } from '../sync'
-import { summarizeSession, textHash } from '../ai'
+import { localSnapshot, importData, scheduleAutoSync, syncNow } from '../sync'
+import { summarizeSession, textHash, aiConfigured, aiProvider, listLocalModels, localBase, type Provider } from '../ai'
 
 function SettingInput({
   settingKey,
@@ -88,6 +88,142 @@ function SettingInput({
         </div>
       )}
     </label>
+  )
+}
+
+/** Where the ✦ features send notes: Claude, or a model served from your own
+ * machine. The choice syncs, so flipping it here flips every device. */
+function AiProvider() {
+  const [provider, setProvider] = useState<Provider>(aiProvider)
+  const [url, setUrl] = useState(getSetting('localUrl'))
+  const [model, setModel] = useState(getSetting('localModel'))
+  const [models, setModels] = useState<string[] | null>(null)
+  const [probe, setProbe] = useState('')
+
+  function choose(p: Provider) {
+    setProvider(p)
+    setSetting('aiProvider', p)
+    scheduleAutoSync()
+  }
+  function commitUrl(v: string) {
+    setUrl(v)
+    setSetting('localUrl', v.trim())
+    setModels(null)
+    scheduleAutoSync()
+  }
+  function commitModel(v: string) {
+    setModel(v)
+    setSetting('localModel', v.trim())
+    scheduleAutoSync()
+  }
+  async function findModels() {
+    setProbe('checking…')
+    try {
+      const found = await listLocalModels(url)
+      setModels(found)
+      setProbe(found.length ? `connected · ${found.length} available` : 'connected, but no models are loaded')
+      if (found.length === 1 && !model) commitModel(found[0])
+    } catch (e) {
+      setModels(null)
+      setProbe(e instanceof Error ? e.message : 'could not connect')
+    }
+  }
+
+  return (
+    <>
+      <div className="field">
+        <span className="label-text">where the ai runs</span>
+        <span className="track-chips" role="radiogroup" aria-label="AI provider">
+          {(
+            [
+              ['claude', 'claude (anthropic)'],
+              ['local', 'local model'],
+            ] as const
+          ).map(([p, label]) => (
+            <button
+              key={p}
+              type="button"
+              role="radio"
+              aria-checked={provider === p}
+              className={`btn-small ${provider === p ? 'btn-primary' : 'btn-ghost'}`}
+              onClick={() => choose(p)}
+            >
+              {label}
+            </button>
+          ))}
+        </span>
+      </div>
+
+      {provider === 'claude' ? (
+        <>
+          <SettingInput settingKey="apiKey" label="Anthropic API key" placeholder="sk-ant-…" password />
+          <p className="muted small">
+            create a key at <code>console.anthropic.com</code> → api keys. notes are sent to the
+            claude api when you run an analysis or open/save a session note (for its ✦ summary and
+            review) — never otherwise.
+          </p>
+        </>
+      ) : (
+        <>
+          <label className="field">
+            <span className="label-text">server address</span>
+            <div className="row">
+              <input
+                type="text"
+                placeholder="http://localhost:1234"
+                value={url}
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
+                onChange={(e) => commitUrl(e.target.value)}
+              />
+              <button
+                type="button"
+                className="btn-small"
+                disabled={!url.trim()}
+                onClick={() => void findModels()}
+              >
+                find models
+              </button>
+            </div>
+          </label>
+          {probe && <p className="muted small" style={{ marginTop: -6 }}>{probe}</p>}
+          <label className="field">
+            <span className="label-text">model</span>
+            <input
+              type="text"
+              placeholder="tap find models, or type its name"
+              value={model}
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              onChange={(e) => commitModel(e.target.value)}
+            />
+          </label>
+          {models && models.length > 1 && (
+            <div className="track-chips" style={{ marginBottom: 10 }}>
+              {models.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  className={`btn-small ${m === model ? 'btn-primary' : 'btn-ghost'}`}
+                  onClick={() => commitModel(m)}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+          )}
+          <p className="muted small">
+            requests go only to {url.trim() ? <code>{localBase(url)}</code> : 'this server'} — if it
+            can't be reached the feature says so; it never falls back to claude. any server that
+            speaks the openai chat api works (lm studio, ollama). on the machine running it the
+            address can be <code>http://localhost:…</code>; from your other devices it has to be an
+            https address, e.g. one from <code>tailscale serve</code>.
+          </p>
+        </>
+      )}
+    </>
   )
 }
 
@@ -247,14 +383,14 @@ export default function Settings() {
 
   /** one-time maintenance: re-run every ✦ summary under the current about-you text */
   async function regenerateSummaries() {
-    const apiKey = getSetting('apiKey')
-    if (!apiKey || regenProgress) return
+    const aiReady = aiConfigured()
+    if (!aiReady || regenProgress) return
     const targets = (await db.sessions.toArray()).filter((s) => alive(s) && s.notes.trim())
     let done = 0
     for (const s of targets) {
       setRegenProgress(`✦ ${done + 1}/${targets.length}…`)
       try {
-        const summary = await summarizeSession(apiKey, s.notes, s.takeaways)
+        const summary = await summarizeSession(s.notes, s.takeaways)
         if (summary) {
           await patch(db.sessions, s.id, {
             summary,
@@ -317,12 +453,7 @@ export default function Settings() {
     <div>
       <div className="card">
         <h2>AI insights</h2>
-        <SettingInput
-          settingKey="apiKey"
-          label="Anthropic API key"
-          placeholder="sk-ant-…"
-          password
-        />
+        <AiProvider />
         <SettingInput
           settingKey="aboutMe"
           label="about you (shared with the ai)"
@@ -330,10 +461,8 @@ export default function Settings() {
           multiline
         />
         <p className="muted small">
-          create a key at <code>console.anthropic.com</code> → api keys. once sync is set up, the
-          key and the about-you text travel to your other devices inside the same encrypted blob as
-          your notes — enter them once. notes are sent to the claude api when you run an analysis or
-          open/save a session note (for its ✦ summary and review) — never otherwise.
+          once sync is set up, these settings travel to your other devices inside the same encrypted
+          blob as your notes — enter them once.
         </p>
         <button className="btn-small btn-ghost" disabled={!!regenProgress} onClick={regenerateSummaries}>
           {regenProgress ?? '↻ regenerate all summaries (after editing the text above)'}

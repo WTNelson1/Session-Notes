@@ -17,6 +17,11 @@ interface SyncedSettings {
   updatedAt: number
   /** aboutMe's own LWW stamp; absent in pre-split blobs */
   aboutMeUpdatedAt?: number
+  /** where AI requests go. Synced so that switching to a local model on one
+   * device switches them all — otherwise another device would keep sending
+   * notes to Claude. One stamp: a url without its model is meaningless. */
+  ai?: { provider: string; url: string; model: string }
+  aiUpdatedAt?: number
 }
 
 /** aboutMe's stamp on this device. Pre-split devices stamped both fields with
@@ -51,6 +56,12 @@ export async function localSnapshot(includeSettings = false): Promise<Snapshot> 
       aboutMe: getSetting('aboutMe'),
       updatedAt: Number(getSetting('apiKeyUpdatedAt') || 0),
       aboutMeUpdatedAt: localAboutMeStamp(),
+      ai: {
+        provider: getSetting('aiProvider'),
+        url: getSetting('localUrl'),
+        model: getSetting('localModel'),
+      },
+      aiUpdatedAt: Number(getSetting('aiUpdatedAt') || 0),
     }
   }
   return out
@@ -76,11 +87,14 @@ export function mergeSnapshots(a: Snapshot, b: Snapshot): Snapshot {
   else {
     const key = sb.updatedAt > sa.updatedAt ? sb : sa
     const about = aboutStampOf(sb) > aboutStampOf(sa) ? sb : sa
+    const ai = (sb.aiUpdatedAt ?? 0) > (sa.aiUpdatedAt ?? 0) ? sb : sa
     out._settings = {
       apiKey: key.apiKey,
       updatedAt: key.updatedAt,
       aboutMe: about.aboutMe,
       aboutMeUpdatedAt: aboutStampOf(about),
+      ai: ai.ai,
+      aiUpdatedAt: ai.aiUpdatedAt ?? 0,
     }
   }
   return out
@@ -97,6 +111,12 @@ function applySyncedSettings(s?: SyncedSettings) {
   if (aboutStampOf(s) > localAboutMeStamp()) {
     setSetting('aboutMe', s.aboutMe ?? '')
     setSetting('aboutMeUpdatedAt', String(aboutStampOf(s)))
+  }
+  if (s.ai && (s.aiUpdatedAt ?? 0) > Number(getSetting('aiUpdatedAt') || 0)) {
+    setSetting('aiProvider', s.ai.provider)
+    setSetting('localUrl', s.ai.url)
+    setSetting('localModel', s.ai.model)
+    setSetting('aiUpdatedAt', String(s.aiUpdatedAt))
   }
 }
 

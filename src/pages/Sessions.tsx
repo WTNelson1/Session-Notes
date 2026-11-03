@@ -2,8 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, alive, patch, trackOf } from '../db'
-import { summarizeSession, textHash } from '../ai'
-import { getSetting } from '../settings'
+import { summarizeSession, textHash, aiConfigured } from '../ai'
 
 export default function Sessions() {
   const [progress, setProgress] = useState<string | null>(null)
@@ -14,20 +13,20 @@ export default function Sessions() {
       .sort((a, b) => b.date.localeCompare(a.date)),
   )
 
-  const apiKey = getSetting('apiKey')
+  const aiReady = aiConfigured()
   const manyTracks = new Set((sessions ?? []).map(trackOf)).size > 1
   const summarizable = sessions?.filter((s) => s.notes.trim()) ?? []
   const unsummarized = summarizable.filter((s) => !s.summary)
 
   /** force=true re-runs every note (e.g. after changing the about-you context) */
   async function backfill(force: boolean) {
-    if (!apiKey || progress) return
+    if (!aiReady || progress) return
     const targets = force ? summarizable : unsummarized
     let done = 0
     for (const s of targets) {
       setProgress(`✦ ${done + 1}/${targets.length}…`)
       try {
-        const summary = await summarizeSession(apiKey, s.notes, s.takeaways)
+        const summary = await summarizeSession(s.notes, s.takeaways)
         if (summary) {
           await patch(db.sessions, s.id, {
             summary,
@@ -48,7 +47,7 @@ export default function Sessions() {
         ＋ new session note
       </Link>
 
-      {apiKey && unsummarized.length > 0 && (
+      {aiReady && unsummarized.length > 0 && (
         <button
           className="btn-small"
           style={{ display: 'block', margin: '0 auto 14px' }}
