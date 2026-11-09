@@ -8,6 +8,7 @@ import { getSetting } from '../settings'
 import { useDraft } from '../autosave'
 import TrackSelect from '../components/TrackSelect'
 import { useTracks } from '../tracks'
+import { byRank, nudge } from '../order'
 
 function SubItemInput({ parentId }: { parentId: string }) {
   const [text, setText] = useState('')
@@ -307,6 +308,9 @@ export default function Prep() {
   const track = pickedTrack ?? tracks.defaultTrack
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [pickingId, setPickingId] = useState<string | null>(null)
+  // arrange mode trades each row's actions for ↑↓ — six buttons a row would
+  // crowd a phone, and you arrange rarely but tick and file constantly
+  const [arranging, setArranging] = useState(false)
 
   const items = useLiveQuery(async () => (await db.prepItems.toArray()).filter(alive))
 
@@ -318,7 +322,7 @@ export default function Prep() {
       .filter((i) => i.parentId === id)
       .sort((a, b) => a.createdAt - b.createdAt)
 
-  const open = tops.filter(stillOpen)
+  const open = tops.filter(stillOpen).sort(byRank)
   const done = tops.filter((i) => i.done)
   const letGo = tops
     .filter((i) => !i.done && i.letGoAt)
@@ -392,7 +396,36 @@ export default function Prep() {
     ))
   }
 
-  function renderTopic(i: PrepItem) {
+  /** one queue row; `group` is the run it sits in (same track and bucket),
+   * which is what its arrows move it within */
+  function renderTopic(i: PrepItem, idx: number, group: PrepItem[]) {
+    if (arranging) {
+      return (
+        <div key={i.id} className="topic-group">
+          <div className="check-item">
+            <span className="text">{i.text}</span>
+            <button
+              className="btn-small btn-ghost sheet-move"
+              onClick={() => nudge(group, idx, -1)}
+              disabled={idx === 0}
+              aria-label="Move up"
+              title="move up"
+            >
+              ↑
+            </button>
+            <button
+              className="btn-small btn-ghost sheet-move"
+              onClick={() => nudge(group, idx, 1)}
+              disabled={idx === group.length - 1}
+              aria-label="Move down"
+              title="move down"
+            >
+              ↓
+            </button>
+          </div>
+        </div>
+      )
+    }
     return (
       <div key={i.id} className="topic-group">
         <div className="check-item">
@@ -479,6 +512,20 @@ export default function Prep() {
             ⎙ session sheet
           </Link>
         </div>
+
+        {open.length > 1 && (
+          <div className="row-between" style={{ marginTop: 10 }}>
+            <span className="muted small">
+              {arranging ? 'top is what you raise first · the session sheet follows' : ''}
+            </span>
+            <button
+              className={`btn-small ${arranging ? 'btn-primary' : 'btn-ghost'}`}
+              onClick={() => setArranging(!arranging)}
+            >
+              {arranging ? 'done' : '↕ arrange'}
+            </button>
+          </div>
+        )}
 
         <div style={{ marginTop: 10 }}>
           {queueTracks.map((tr) => {

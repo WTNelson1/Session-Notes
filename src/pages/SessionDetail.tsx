@@ -13,6 +13,7 @@ import { useAutosave } from '../autosave'
 import Markdown from '../components/Markdown'
 import TrackSelect from '../components/TrackSelect'
 import { useTracks } from '../tracks'
+import { byRank } from '../order'
 
 /** what a note looks like on disk — autosave compares these, not object identity */
 const sig = (date: string, notes: string, takeaways: string, track: string) =>
@@ -67,7 +68,7 @@ export default function SessionDetail() {
   const knownTracks = tracks.known
   const openTops = (prepItems ?? [])
     .filter((p) => !p.parentId && stillOpen(p) && trackOf(p) === track)
-    .sort((a, b) => b.createdAt - a.createdAt)
+    .sort(byRank)
   const childrenOf = (pid: string) =>
     (prepItems ?? []).filter((p) => p.parentId === pid).sort((a, b) => a.createdAt - b.createdAt)
 

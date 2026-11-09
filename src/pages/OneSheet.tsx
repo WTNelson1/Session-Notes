@@ -2,6 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, alive, patch, stillOpen, todayStr, trackOf, DEFAULT_TRACK, type PrepItem } from '../db'
 import { useDraft } from '../autosave'
 import { useTracks } from '../tracks'
+import { byRank, nudge } from '../order'
 
 // The sheet you hand her at the start of a session, in her reading order:
 // last time → new since → carried over → the week in feelings → practices.
@@ -95,7 +96,7 @@ export default function OneSheet() {
         .sort((a, b) => a.date.localeCompare(b.date)),
       topics: prep
         .filter((p) => !p.parentId && stillOpen(p) && trackOf(p) === t)
-        .sort((a, b) => (a.sheetOrder ?? a.createdAt) - (b.sheetOrder ?? b.createdAt)),
+        .sort(byRank),
     }))
     .filter((b) => b.sessions.length > 0 || b.topics.length > 0)
   const kidsOf = (id: string) =>
@@ -108,16 +109,13 @@ export default function OneSheet() {
   // The split itself is a guess (created before vs after the last note was
   // started), overridable per topic; an override is scoped to that note's id,
   // so it lapses on its own once a newer session note exists.
-  // Manual order beats age; the two keys share a scale (see db.ts).
-  const sortKey = (t: PrepItem) => t.sheetOrder ?? t.createdAt
-  const byKey = (a: PrepItem, b: PrepItem) => sortKey(a) - sortKey(b)
   const sectionOf = (t: PrepItem): 'new' | 'carried' => {
     if (!last) return 'new'
     if (t.sheetSection && t.sheetSectionFor === last.id) return t.sheetSection
     return t.createdAt > last.createdAt ? 'new' : 'carried'
   }
-  const fresh = tops.filter((t) => sectionOf(t) === 'new').sort(byKey)
-  const carried = tops.filter((t) => sectionOf(t) === 'carried').sort(byKey)
+  const fresh = tops.filter((t) => sectionOf(t) === 'new').sort(byRank)
+  const carried = tops.filter((t) => sectionOf(t) === 'carried').sort(byRank)
 
   const shift = (t: PrepItem) => {
     if (!last) return
@@ -127,18 +125,6 @@ export default function OneSheet() {
     })
   }
 
-  /** Nudge within a section: swap sort keys with the neighbour. Two writes,
-   * nothing else in the list moves. */
-  const nudge = (list: PrepItem[], i: number, dir: -1 | 1) => {
-    const a = list[i]
-    const b = list[i + dir]
-    if (!a || !b) return
-    let ka = sortKey(a)
-    let kb = sortKey(b)
-    if (ka === kb) kb += dir // same instant (bulk import) — force the swap to hold
-    void patch(db.prepItems, a.id, { sheetOrder: kb })
-    void patch(db.prepItems, b.id, { sheetOrder: ka })
-  }
 
   const tally = new Map<string, number>()
   for (const j of journal) for (const w of j.words) tally.set(w, (tally.get(w) ?? 0) + 1)
@@ -159,6 +145,9 @@ export default function OneSheet() {
     journal.length === 0 &&
     focus.length === 0
 
+  // arrows stop at a bucket boundary: the queue order keeps buckets together,
+  // so a swap across one would change nothing on screen
+  const sameRun = (a?: PrepItem, b?: PrepItem) => !!a && !!b && (a.bucket ?? '') === (b.bucket ?? '')
   const topicLines = (items: PrepItem[]) =>
     items.map((t, i) => (
       <div key={t.id}>
@@ -170,7 +159,7 @@ export default function OneSheet() {
               <button
                 className="btn-small btn-ghost sheet-move"
                 onClick={() => nudge(items, i, -1)}
-                disabled={i === 0}
+                disabled={!sameRun(t, items[i - 1])}
                 aria-label="Move up"
                 title="move up"
               >
@@ -179,7 +168,7 @@ export default function OneSheet() {
               <button
                 className="btn-small btn-ghost sheet-move"
                 onClick={() => nudge(items, i, 1)}
-                disabled={i === items.length - 1}
+                disabled={!sameRun(t, items[i + 1])}
                 aria-label="Move down"
                 title="move down"
               >

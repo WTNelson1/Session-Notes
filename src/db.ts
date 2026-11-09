@@ -30,10 +30,11 @@ export interface PrepItem extends BaseRec {
    * the override expires and the guess takes over again. */
   sheetSection?: 'new' | 'carried'
   sheetSectionFor?: string
-  /** session-sheet manual sort key. Unset means "sort by createdAt" (the two
-   * share a scale — this starts life as a neighbour's createdAt and diverges
-   * from there via swaps). Deliberately not session-scoped: an ordering
-   * preference goes stale at worst, never wrong, so it is left standing. */
+  /** manual position in the queue, shared by prep, the session sheet, today
+   * and the check-off list (see order.ts) — higher sits nearer the top. Unset
+   * means "rank by createdAt" (the two share a scale: this starts life as a
+   * neighbour's createdAt and diverges via swaps). The name predates prep
+   * arranging; it stays because it syncs. */
   sheetOrder?: number
 }
 
