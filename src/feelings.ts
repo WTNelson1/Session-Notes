@@ -71,7 +71,7 @@ export const WHEEL: CoreFamily[] = [
       { name: 'interested', children: ['curious', 'inquisitive'] },
       { name: 'proud', children: ['successful', 'confident'] },
       { name: 'accepted', children: ['respected', 'valued'] },
-      { name: 'powerful', children: ['courageous', 'creative'] },
+      { name: 'powerful', children: ['courageous', 'creative', 'competent'] },
       { name: 'peaceful', children: ['loving', 'thankful'] },
       { name: 'trusting', children: ['sensitive', 'intimate'] },
       { name: 'optimistic', children: ['hopeful', 'inspired'] },
