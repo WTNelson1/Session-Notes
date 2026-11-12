@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { NavLink, Route, Routes, useLocation, Link } from 'react-router-dom'
 import AppSwitcher from '@personal-os/kit/AppSwitcher'
-import TopNav from './components/TopNav'
 import Today from './pages/Today'
 import Prep from './pages/Prep'
 import Sessions from './pages/Sessions'
@@ -95,7 +94,7 @@ const APPS = [
 const NAV = [
   { to: '/', end: true, glyph: '◉', label: 'today' },
   { to: '/journal', end: false, glyph: '✎', label: 'journal' },
-  { to: '/prep', end: false, glyph: '☰', label: 'prep' },
+  { to: '/prep', end: false, glyph: '⚑', label: 'prep' },
   { to: '/sessions', end: false, glyph: '≣', label: 'sessions' },
   { to: '/insights', end: false, glyph: '✦', label: 'insights' },
 ]
@@ -132,10 +131,6 @@ function Shell() {
 
   return (
     <>
-      {/* Wide screens get Helm's folder tabs; narrow screens get the header +
-          bottom bar. Both are always rendered — index.css shows one. */}
-      <TopNav items={NAV} apps={IS_SUITE ? APPS : []} current="anchor" actions={actions} />
-
       <div className="app-shell">
         <header className="app-header">
           <h1>{IS_SUITE ? <AppSwitcher apps={APPS} current="anchor" /> : <span>anchor</span>}</h1>
