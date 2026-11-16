@@ -16,6 +16,25 @@ function shortStamp(t: number): string {
   return new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
+/** 'YYYY-MM-DD' → local midnight that day */
+function dayStart(date: string): number {
+  const [y, m, d] = date.split('-').map(Number)
+  return new Date(y, m - 1, d).getTime()
+}
+
+/** where "since last session" starts — see the boundary note in OneSheet */
+function sessionCut(date: string, createdAt: number): number {
+  return todayStr(new Date(createdAt)) === date ? createdAt : dayStart(date)
+}
+
+/** 'YYYY-MM-DD' → 'thu nov 13' */
+function dayLabel(date: string): string {
+  return new Date(dayStart(date))
+    .toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+    .replace(',', '')
+    .toLowerCase()
+}
+
 const SNIPPET = 140
 function snippet(text: string): string {
   // notes are outlines — drop the bullet markers and run the lines together
@@ -68,14 +87,17 @@ export default function OneSheet() {
       ? defaultTrack
       : (sheetTracks[0] ?? DEFAULT_TRACK)
 
-  // "Last time" is the newest saved note IN THIS ROOM. Its createdAt is the
-  // boundary: topics that existed before you started writing it were on the
-  // table that session; anything newer is this week's material.
+  // "Last time" is the newest saved note IN THIS ROOM, and the session it
+  // records is the boundary: anything newer is this week's material. Written
+  // the same day, the note's createdAt is the precise cut (after the session,
+  // before tonight's journaling). Written later — a note typed up days after —
+  // createdAt says nothing about when the session was, so the cut falls back to
+  // the start of the session's own date and that day's entries stay in.
   const last = sessions.filter((x) => trackOf(x) === track)[0]
-    const boundary = last ? last.createdAt : Date.now() - 7 * DAY
-    const boundaryDate = todayStr(new Date(boundary))
-    const journal = journalAll.filter((j) => j.at >= boundary).sort((a, b) => a.at - b.at)
-    const logs = data.logs.filter((l) => l.date >= boundaryDate)
+  const boundary = last ? sessionCut(last.date, last.createdAt) : Date.now() - 7 * DAY
+  const boundaryDate = todayStr(new Date(boundary))
+  const journal = journalAll.filter((j) => j.at >= boundary).sort((a, b) => a.at - b.at)
+  const logs = data.logs.filter((l) => l.date >= boundaryDate)
 
   const tops = prep.filter((p) => !p.parentId && stillOpen(p) && trackOf(p) === track)
 
@@ -112,7 +134,7 @@ export default function OneSheet() {
   const sectionOf = (t: PrepItem): 'new' | 'carried' => {
     if (!last) return 'new'
     if (t.sheetSection && t.sheetSectionFor === last.id) return t.sheetSection
-    return t.createdAt > last.createdAt ? 'new' : 'carried'
+    return t.createdAt > boundary ? 'new' : 'carried'
   }
   const fresh = tops.filter((t) => sectionOf(t) === 'new').sort(byRank)
   const carried = tops.filter((t) => sectionOf(t) === 'carried').sort(byRank)
@@ -135,7 +157,7 @@ export default function OneSheet() {
   const fromLast = last ? practices.filter((p) => p.sourceSessionId === last.id) : []
   const focus = fromLast.length ? fromLast : practices.filter((p) => p.active)
   const doneCount = (pid: string) => logs.filter((l) => l.practiceId === pid).length
-  const sinceLabel = last ? 'since last session' : 'this week'
+  const sinceLabel = last ? `since ${dayLabel(last.date)}` : 'this week'
 
   const empty =
     !last &&
