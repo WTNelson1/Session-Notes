@@ -7,6 +7,7 @@ import '@fontsource/geist-mono/400.css'
 import '@fontsource/geist-mono/500.css'
 import { initBackground } from '@personal-os/kit'
 import { backfillTracks } from './db'
+import { migrateQueueOrder } from './order'
 import App from './App'
 import './index.css'
 
@@ -29,6 +30,7 @@ void navigator.storage?.persist?.()
 
 // stamp pre-track data with the original room (one-time per device, idempotent)
 void backfillTracks()
+void migrateQueueOrder()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

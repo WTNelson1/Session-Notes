@@ -5,7 +5,6 @@ import { db, alive, newRec, softDelete, todayStr, stillOpen, trackOf } from '../
 import FeelingChips from '../components/FeelingChips'
 import FeelingsWheel from '../components/FeelingsWheel'
 import TrackSelect from '../components/TrackSelect'
-import { byRank } from '../order'
 import { useTracks } from '../tracks'
 
 export default function Today() {
@@ -23,9 +22,9 @@ export default function Today() {
   const openPrep = useLiveQuery(async () =>
     (await db.prepItems.where('done').equals(0).toArray())
       .filter((p) => alive(p) && !p.parentId && stillOpen(p))
-      // the queue's own order, as arranged in prep — without a sort Dexie
-      // hands back index order (UUID keys, i.e. shuffled)
-      .sort(byRank),
+      // newest first: the preview is "what did I jot lately", while prep
+      // itself runs oldest-first as the agenda
+      .sort((a, b) => b.createdAt - a.createdAt),
   )
   const manyTracks = new Set((openPrep ?? []).map(trackOf)).size > 1
   const practices = useLiveQuery(async () =>

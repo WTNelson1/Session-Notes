@@ -159,8 +159,8 @@ function BrainDump({ buckets, track }: { buckets: string[]; track: string }) {
     const base = Date.now()
     for (let i = 0; i < draft.length; i++) {
       const t = draft[i]
-      // stamped so the queue (newest first) reads in the order of the draft
-      const at = base + (draft.length - i)
+      // stamped so the queue (oldest first) reads in the order of the draft
+      const at = base + i
       const parent = { ...newRec(), createdAt: at, updatedAt: at }
       await db.prepItems.add({
         ...parent,

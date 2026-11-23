@@ -30,11 +30,13 @@ export interface PrepItem extends BaseRec {
    * the override expires and the guess takes over again. */
   sheetSection?: 'new' | 'carried'
   sheetSectionFor?: string
-  /** manual position in the queue, shared by prep, the session sheet, today
-   * and the check-off list (see order.ts) — higher sits nearer the top. Unset
+  /** manual position in the queue, shared by prep, the session sheet and
+   * the check-off list (see order.ts) — lower sits nearer the top. Unset
    * means "rank by createdAt" (the two share a scale: this starts life as a
-   * neighbour's createdAt and diverges via swaps). The name predates prep
-   * arranging; it stays because it syncs. */
+   * neighbour's createdAt and diverges via swaps). */
+  queuePos?: number
+  /** legacy newest-first position (higher = nearer the top); converted to
+   * queuePos and cleared by migrateQueueOrder. Never written any more. */
   sheetOrder?: number
 }
 
